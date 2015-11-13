@@ -7,7 +7,7 @@
             [org.httpkit.server :as httpkit]
             [org.httpkit.timer :as timer]
             [cheshire.core :as json]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as log]
             [clojure.data.codec.base64 :as base64]
             [clj-wamp.core :refer [project-version]])
   (:import [org.httpkit.server AsyncChannel]

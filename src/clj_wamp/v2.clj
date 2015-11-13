@@ -1,12 +1,20 @@
 (ns clj-wamp.v2
   (:require
-    [clojure.core.async :as async]
-    [clojure.tools.logging :as log]
+    [clojure.core.async
+      :as async
+      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
+                                          alts! alts!! timeout pub]]
+    [taoensso.timbre :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]))
 
 (def subprotocol-id "wamp.2.json")
+
+(def messages (chan))
+
+(def message-chan
+  (pub messages #(:topic %)))
 
 (def ^:const message-id-table
   {:HELLO 1
@@ -128,6 +136,33 @@
   [instance request-id options uri]
   (send! instance [(message-id :REGISTER) request-id options uri]))
 
+(defn call
+  "[CALL, Request|id, Options|dict, Procedure|uri]
+   [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
+   [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list,ArgumentsKw|dict]
+
+   'Request' is a random, ephemeral ID chosen by the Caller and
+   used to correlate the Dealer's response with the request.
+
+      o  'Options' is a dictionary that allows to provide additional call
+   request details in an extensible way.  This is described further
+   below.
+
+      o  'Procedure' is the URI of the procedure to be called.
+
+      o  'Arguments' is a list of positional call arguments (each of
+   arbitrary type).  The list may be of zero length.
+
+      o  'ArgumentsKw' is a dictionary of keyword call arguments (each of
+   arbitrary type).  The dictionary may be empty."
+
+  [instance request-id options uri seq-args kw-args]
+  (let [args [(message-id :CALL) request-id options uri]
+        args (if (some? seq-args) (conj args seq-args) args)
+        args (if (some? kw-args) (conj args kw-args) args)]
+    (send! instance args)))
+
+
 (defn yield
   "[YIELD, INVOCATION.Request|id, Options|dict]
    [YIELD, INVOCATION.Request|id, Options|dict, Arguments|list]
@@ -171,8 +206,8 @@
 
 (defn- yield-progressive
   [instance req-id return-chan]
-  (async/go-loop []
-    (when-let [return (async/<! return-chan)]
+  (go-loop []
+    (when-let [return (<! return-chan)]
       (yield-return instance req-id return)
       (recur))))
 
@@ -270,3 +305,14 @@
              {:message "Unregistered RPC"
               :reg-id reg-id}
              (error-uri :no-such-registration)))))
+
+(defmethod handle-message :RESULT
+  [instance data]
+  "[RESULT, CALL.Request|id, Details|dict]
+   [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list]
+   [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list, YIELD.ArgumentsKw|dict]"
+  (println instance)
+  (println data)
+  (let [[_ req-id details arguments arguments-kw] data]
+   (go (>! messages {:topic :RESULT :req-id req-id :details details, :arguments arguments, :arguments-kw arguments-kw})))
+  )

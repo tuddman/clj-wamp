@@ -2,7 +2,7 @@
       :doc "WAMP V2 application node"}
   clj-wamp.node
   (:require
-    [clojure.tools.logging :as log]
+    [taoensso.timbre :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]
@@ -50,6 +50,20 @@
    (wamp/publish instance (core/new-rand-id) {} event-uri seq-args kw-args)))
 
 (defn publish-to!
+  "Publish an event to specific session ids"
+  [instance session-ids event-uri seq-args kw-args]
+  (wamp/publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+
+(defn call!
+  "Call a procedure"
+  ([instance event-uri]
+   (call! instance event-uri nil))
+  ([instance event-uri seq-args]
+   (call! instance event-uri seq-args nil))
+  ([instance event-uri seq-args kw-args]
+   (wamp/call instance (core/new-rand-id) {} event-uri seq-args kw-args)))
+
+(defn call-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
   (wamp/publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))

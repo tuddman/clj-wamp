@@ -1,6 +1,6 @@
 (ns clj-wamp.core
   (:require 
-    [clojure.tools.logging :as log]
+    [taoensso.timbre :as log]
     [clojure.string :refer [split]]
     [org.httpkit.server :as httpkit]
     [cheshire.core :as json])
