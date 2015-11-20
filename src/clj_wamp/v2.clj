@@ -12,9 +12,13 @@
 (def subprotocol-id "wamp.2.json")
 
 (def messages (chan))
+(def errors (chan))
 
 (def message-chan
   (pub messages #(:topic %)))
+
+(def error-chan
+  (pub errors #(:topic %)))
 
 (def ^:const message-id-table
   {:HELLO 1
@@ -73,7 +77,8 @@
    ; Errors below are not part of the specification
    :internal-error "wamp.error.internal-error"
    :application-error "wamp.error.application_error"
-   :bad-request "wamp.error.bad-request"})
+   :bad-request "wamp.error.bad-request"
+   :runtime-error "wamp.error.runtime_error"})
 
 (defmacro error-uri
   [error-keyword]
@@ -220,7 +225,7 @@
                           :map-args map-args})]
       (yield-return instance req-id return))
     (catch Throwable e
-      (error instance (message-id :INVOCATION) req-id (exception-message instance e)))))
+      (error instance (message-id :INVOCATION) req-id (exception-message instance e) (error-uri :internal-error)))))
 
 (defmulti handle-error (fn [instance data] (reverse-message-id (second data))))
 
@@ -230,7 +235,7 @@
   nil)
 
 (defmethod handle-error :PUBLISH
-  [instance data]
+  [_ data]
   "[ERROR, PUBLISH, PUBLISH.Request|id, Details|dict, Error|uri]"
   (log/error "Router failed to publish event" data)
   nil)
@@ -244,6 +249,17 @@
                  [reg-uri reg-fn] (get pending req-id)]
              (log/error "Failed to register RPC method:" reg-uri)
              [(assoc unregistered reg-uri reg-fn) registered (dissoc pending req-id)])))
+  nil)
+
+(defmethod handle-error :CALL
+  [_ data]
+  "[ERROR, CALL, CALL.Request|id, Details|dict, Error|uri]
+   [ERROR, CALL, CALL.Request|id, Details|dict, Error|uri, Arguments|list]
+   [ERROR, CALL, CALL.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]"
+  (let [[_ _ req-id details error-uri arguments arguments-kw] data]
+    (go (>! errors {:topic :CALL :req-id req-id :details details, :error-uri error-uri :arguments arguments, :arguments-kw arguments-kw}))
+
+    (log/error "Callee was unable to process the call " error-uri))
   nil)
 
 (defmulti handle-message (fn [instance data] (reverse-message-id (first data))))
@@ -307,12 +323,11 @@
              (error-uri :no-such-registration)))))
 
 (defmethod handle-message :RESULT
-  [instance data]
-  "[RESULT, CALL.Request|id, Details|dict]
+  [_ data]
+  "Receives the Result Message after an call. Publishes it via core async, using the topic :RESULT
+   [RESULT, CALL.Request|id, Details|dict]
    [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list]
    [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list, YIELD.ArgumentsKw|dict]"
-  (println instance)
-  (println data)
   (let [[_ req-id details arguments arguments-kw] data]
    (go (>! messages {:topic :RESULT :req-id req-id :details details, :arguments arguments, :arguments-kw arguments-kw})))
   )
