@@ -7,7 +7,9 @@
     [taoensso.timbre :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
-    [clj-wamp.core :as core]))
+    [clj-wamp.core :as core]
+    [clj-wamp.lib :as lib]
+    ))
 
 (def subprotocol-id "wamp.2.json")
 
@@ -103,10 +105,35 @@
          [(message-id :HELLO)
           (:realm instance)
           {:roles
-           {:callee {}
+           {:callee     {:features
+                         {
+                          :caller_identification      true
+                          :pattern_based_registration true
+                          :progressive_call_results   true
+                          :registration_revocation    true
+                          :shared_registration        true
+                          }
+                         }
+            :caller     {:features
+                         {
+                          :caller_identification    true
+                          :progressive_call_results true
+                          }
+                         }
+            :subscriber {:features
+                         {
+                          :caller_identification    true
+                          :progressive_call_results true
+                          }
+                         }
             :publisher
-            {:features
-             {:subscriber_blackwhite_listing true}}}}]))
+                        {:features
+                         {
+                          :subscriber_blackwhite_listing true
+                          :publisher_exclusion           true
+                          :publisher_identification      true
+                          }
+                         }}}]))
 
 (defn abort
   "[ABORT, Details|dict, Reason|uri]"
@@ -188,6 +215,19 @@
                [(dissoc unregistered reg-uri) registered (assoc pending req-id [reg-uri reg-fn])])
              [unregistered registered pending]))))
 
+(defn register-new!
+  "Associates the uri to the function as unregistred command. If the uri is already registred,
+  it returns the existing map"
+  [instance reg-uri reg-fn]
+  (swap! (:registrations instance)
+         (fn [[unregistered registered pending :as registrations]]
+           (if-not (lib/contains-nested? (lib/map->vec registrations) #(= % reg-uri))
+             [(assoc unregistered reg-uri reg-fn) registered pending]
+             [unregistered registered pending])
+           ))
+  (register-next! instance)
+  )
+
 (defn- exception-message
   [{:keys [debug?] :as instance} ex]
   (if debug?
@@ -246,9 +286,14 @@
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
            (let [req-id (nth data 2)
+                 error-msg (nth data 4)
                  [reg-uri reg-fn] (get pending req-id)]
              (log/error "Failed to register RPC method:" reg-uri)
-             [(assoc unregistered reg-uri reg-fn) registered (dissoc pending req-id)])))
+             (if (= error-msg (error-uri :procedure-already-exists))
+               [(dissoc unregistered reg-uri) registered (dissoc pending req-id)]
+               [(assoc unregistered reg-uri reg-fn) registered (dissoc pending req-id)]
+               )
+             )))
   nil)
 
 (defmethod handle-error :CALL
@@ -270,6 +315,7 @@
 
 (defmethod handle-message :WELCOME
   [instance data]
+  (println instance)
   (register-next! instance))
 
 (defmethod handle-message :ABORT 

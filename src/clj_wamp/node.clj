@@ -68,6 +68,11 @@
   [instance session-ids event-uri seq-args kw-args]
   (wamp/publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
 
+(defn register!
+  "Register an procedure"
+  [instance event-uri fn]
+  (wamp/register-new! instance event-uri fn))
+
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
   (try 
     (swap! (:socket instance)
