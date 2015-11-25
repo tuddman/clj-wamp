@@ -6,7 +6,8 @@
     [cheshire.core :as json]
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]
-    [clj-wamp.v2 :as wamp])
+    [clj-wamp.v2 :as wamp]
+    [clj-wamp.handler.messages :as hm])
   (:import
     [org.eclipse.jetty.websocket.client WebSocketClient]))
 
@@ -24,7 +25,7 @@
                         [nil nil]))]
     (when debug?
       (log/debug "WAMP message received:" msg-str))
-    (wamp/handle-message instance msg-data)))
+    (hm/handle-message instance msg-data)))
 
 (declare connect!)
 
