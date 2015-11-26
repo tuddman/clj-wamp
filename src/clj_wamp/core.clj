@@ -7,7 +7,7 @@
   (:import
     [java.util Random]))
 
-(def ^:const project-version "clj-wamp/2.0.0-SNAPSHOT")
+(def ^:const project-version "clj-wamp/2.1.0-SNAPSHOT")
 
 (def ^:private rand-gen (Random.))
 (def ^:private sess-id-max 9007199254740992) ; 2^53 per WAMP spec

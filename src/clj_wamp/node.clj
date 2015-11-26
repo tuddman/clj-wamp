@@ -6,8 +6,8 @@
     [cheshire.core :as json]
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]
-    [clj-wamp.v2 :as wamp]
-    [clj-wamp.handler.messages :as hm])
+    [clj-wamp.client.v2 :as wamp]
+    [clj-wamp.client.handler.messages :as hm])
   (:import
     [org.eclipse.jetty.websocket.client WebSocketClient]))
 

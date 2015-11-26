@@ -1,4 +1,4 @@
-(ns clj-wamp.channels
+(ns clj-wamp.libs.channels
   (:require
     [clojure.core.async :refer [chan pub]]))
 

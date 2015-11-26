@@ -1,4 +1,4 @@
-(ns clj-wamp.handler.error
+(ns clj-wamp.client.handler.error
   (:require
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
@@ -6,8 +6,8 @@
     [taoensso.timbre :as log]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
-    [clj-wamp.channels :refer [errors]]
-    [clj-wamp.lib :refer [finds-nested]]
+    [clj-wamp.libs.channels :refer [errors]]
+    [clj-wamp.libs.helpers :refer [finds-nested]]
     ))
 
 (defmulti handle-error (fn [instance data] (reverse-message-id (second data))))

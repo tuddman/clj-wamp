@@ -1,4 +1,4 @@
-(ns clj-wamp.v2
+(ns clj-wamp.client.v2
   (:require
     [clojure.core.async
       :refer [>! <! >!! <!! go go-loop chan buffer close! thread
@@ -7,11 +7,11 @@
     [cheshire.core :as json]
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]
-    [clj-wamp.lib :as lib]
+    [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
-    [clj-wamp.handler.error :refer [handle-error]]
-    [clj-wamp.channels :refer [messages]]
+    [clj-wamp.client.handler.error :refer [handle-error]]
+    [clj-wamp.libs.channels :refer [messages]]
     ))
 
 (def subprotocol-id "wamp.2.json")

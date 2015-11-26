@@ -1,4 +1,4 @@
-(ns clj-wamp.lib)
+(ns clj-wamp.libs.helpers)
 
 
 (defn contains-nested?
@@ -14,7 +14,7 @@
        (first))
   )
 
-  (defn map->vec
+(defn map->vec
   "Converts map into vector, removes nil Values"
   [map]
   (->> map

@@ -1,6 +1,6 @@
- (ns main
+(ns main
   (:require [clj-wamp.node :as w]
-            [clj-wamp.v2 :refer [message-chan]]
+            [clj-wamp.libs.channels :refer [message-chan error-chan]]
             [clojure.core.async
              :as async
              :refer [>! <! >!! <!! go go-loop chan buffer close! thread
@@ -10,7 +10,17 @@
 
 (def connection (w/connect! connector))
 
+(defn add
+  [x y]
+  (+ x y)
+  )
+
+(w/register! connector "com.tourviewer.test" add)
+
+
+
 (def subscriber-one (chan))
+(def subscriber-two (chan))
 
 (defn take-and-print [channel prefix]
   (go-loop []
@@ -19,8 +29,8 @@
 
 
 (sub message-chan :RESULT subscriber-one)
+(sub error-chan :CALL subscriber-two)
 
 
 (take-and-print subscriber-one "subscriber-one")
-
-;(go (while true (println "Message " (<! message-chan))))
+(take-and-print subscriber-two "subscriber-two")
