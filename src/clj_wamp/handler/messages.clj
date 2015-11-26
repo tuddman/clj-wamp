@@ -52,8 +52,19 @@
            (let [req-id (nth data 1)
                  reg-id (nth data 2)
                  [reg-uri reg-fn] (get pending req-id)]
-             [unregistered (assoc registered reg-id reg-fn) (dissoc pending req-id)])))
+             [unregistered (assoc registered reg-id [reg-uri reg-fn]) (dissoc pending req-id)])))
   (register-next! instance))
+
+(defmethod handle-message :UNREGISTERED
+  [instance data]
+  "[UNREGISTERED, UNREGISTER.Request|id]"
+  (swap! (:registrations instance)
+         (fn [[unregistered registered pending]]
+           (let [req-id (nth data 1)
+                 [reg-id _] (get pending req-id)]
+             [unregistered (dissoc registered reg-id) (dissoc pending req-id)]))
+         )
+  nil)
 
 (defmethod handle-message :INVOCATION
   [instance data]
@@ -63,7 +74,7 @@
   (let [[_ registered _] @(:registrations instance)
         req-id (nth data 1)
         reg-id (nth data 2)
-        reg-fn (get registered reg-id)]
+        [_ reg-fn] (get registered reg-id)]
     (if (some? reg-fn)
       (perform-invocation instance req-id reg-fn (nth data 3) (nth data 4 []) (nth data 5 nil))
       (error instance (message-id :INVOCATION) req-id

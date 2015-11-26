@@ -8,7 +8,13 @@
        (some k)
        ))
 
-(defn map->vec
+(defn finds-nested
+  [m k]
+  (->> (filter (fn [[_ [child]]] (= child k)) m)
+       (first))
+  )
+
+  (defn map->vec
   "Converts map into vector, removes nil Values"
   [map]
   (->> map

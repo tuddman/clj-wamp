@@ -98,6 +98,11 @@
   [instance request-id options uri]
   (send! instance [(message-id :REGISTER) request-id options uri]))
 
+(defn unregister
+  "[UNREGISTER, Request|id, REGISTERED.Registration|id]"
+  [instance request-id reg-uri]
+  (send! instance [(message-id :UNREGISTER) request-id reg-uri]))
+
 (defn call
   "[CALL, Request|id, Options|dict, Procedure|uri]
    [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
@@ -157,6 +162,18 @@
            ))
   (register-next! instance)
   )
+
+(defn unregister!
+  "Deassociates the procedure with the id and sends the unregister message to the server"
+  [instance reg-uri]
+  (swap! (:registrations instance)
+         (fn [[unregistered registered pending]]
+           (if-let [[reg-id [_ _]] (lib/finds-nested registered reg-uri)]
+             (let [req-id (core/new-rand-id)]
+               (unregister instance req-id reg-id)
+               [unregistered registered (assoc pending req-id [reg-id reg-uri])])
+             [unregistered registered pending])
+             )))
 
 (defn- exception-message
   [{:keys [debug?] :as instance} ex]

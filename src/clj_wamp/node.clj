@@ -71,8 +71,16 @@
 
 (defn register!
   "Register an procedure"
-  [instance event-uri fn]
-  (wamp/register-new! instance event-uri fn))
+  [instance event-uri event-fn]
+  (wamp/register-new! instance
+                      event-uri
+                      (fn [args] (let [seq-args (:seq-args args)]
+                                   (apply event-fn seq-args)))))
+
+(defn unregister!
+  "Register an procedure"
+  [instance event-uri]
+  (wamp/unregister! instance event-uri))
 
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
   (try 

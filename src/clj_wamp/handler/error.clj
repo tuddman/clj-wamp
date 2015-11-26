@@ -7,6 +7,7 @@
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.channels :refer [errors]]
+    [clj-wamp.lib :refer [finds-nested]]
     ))
 
 (defmulti handle-error (fn [instance data] (reverse-message-id (second data))))
@@ -30,10 +31,29 @@
            (let [req-id (nth data 2)
                  error-msg (nth data 4)
                  [reg-uri reg-fn] (get pending req-id)]
-             (log/error "Failed to register RPC method:" reg-uri)
+             (log/error "Failed to register RPC method:" reg-uri "with error " error-msg)
              (if (= error-msg (error-uri :procedure-already-exists))
                [(dissoc unregistered reg-uri) registered (dissoc pending req-id)]
                [(assoc unregistered reg-uri reg-fn) registered (dissoc pending req-id)]
+               )
+             )))
+  nil)
+
+
+(defmethod handle-error :UNREGISTER
+  [instance data]
+  "[ERROR, REGISTER, REGISTER.Request|id, Details|dict, Error|uri]"
+  (swap! (:registrations instance)
+         (fn [[unregistered registered pending]]
+           (let [req-id (nth data 2)
+                 error-msg (nth data 4)
+                 [reg-id reg-uri] (get pending req-id)]
+             (log/error "Failed to unregister RPC method:" reg-uri "with error " error-msg)
+             (if (= error-msg (error-uri :no-such-registration))
+               (if-let [[reg-id [_ _]] (finds-nested registered reg-uri)]
+                 [unregistered (dissoc registered reg-id) (dissoc pending req-id)]
+                 )
+               [unregistered registered (dissoc pending req-id)]
                )
              )))
   nil)
