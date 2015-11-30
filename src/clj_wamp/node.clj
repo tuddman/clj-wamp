@@ -7,7 +7,11 @@
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]
     [clj-wamp.client.v2 :as wamp]
-    [clj-wamp.client.handler.messages :as hm])
+    [clj-wamp.client.handler.messages :as hm]
+    [clj-wamp.client.publisher :refer [publish]]
+    [clj-wamp.client.callee :as callee]
+    [clj-wamp.client.caller :as caller]
+    [clj-wamp.client.publisher :refer [publish]])
   (:import
     [org.eclipse.jetty.websocket.client WebSocketClient]))
 
@@ -48,12 +52,12 @@
   ([instance event-uri seq-args]
    (publish! instance event-uri seq-args nil))
   ([instance event-uri seq-args kw-args]
-   (wamp/publish instance (core/new-rand-id) {} event-uri seq-args kw-args)))
+   (publish instance (core/new-rand-id) {} event-uri seq-args kw-args)))
 
 (defn publish-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
-  (wamp/publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+  (publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
 
 (defn call!
   "Call a procedure"
@@ -62,17 +66,17 @@
   ([instance event-uri seq-args]
    (call! instance event-uri seq-args nil))
   ([instance event-uri seq-args kw-args]
-   (wamp/call instance (core/new-rand-id) {} event-uri seq-args kw-args)))
+   (caller/call instance (core/new-rand-id) {} event-uri seq-args kw-args)))
 
 (defn call-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
-  (wamp/publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+  (caller/call instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
 
 (defn register!
   "Register an procedure"
   [instance event-uri event-fn]
-  (wamp/register-new! instance
+  (callee/register-new! instance
                       event-uri
                       (fn [args] (let [seq-args (:seq-args args)]
                                    (apply event-fn seq-args)))))
@@ -80,7 +84,7 @@
 (defn unregister!
   "Register an procedure"
   [instance event-uri]
-  (wamp/unregister! instance event-uri))
+  (callee/unregister! instance event-uri))
 
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
   (try 

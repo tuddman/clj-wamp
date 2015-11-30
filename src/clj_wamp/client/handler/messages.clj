@@ -3,11 +3,12 @@
     [clojure.core.async :refer [go >!]]
     [taoensso.timbre :as log]
     [gniazdo.core :as ws]
-    [clj-wamp.client.v2 :refer [perform-invocation error goodbye register-next!]]
+    [clj-wamp.client.v2 :refer [error goodbye]]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]
     [clj-wamp.libs.channels :refer [messages]]
+    [clj-wamp.client.callee :refer [perform-invocation register-next!]]
     ))
 
 (defmulti handle-message (fn [instance data] (reverse-message-id (first data))))
