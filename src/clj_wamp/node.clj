@@ -13,10 +13,12 @@
     [clj-wamp.client.caller :as caller]
     [clj-wamp.client.publisher :refer [publish]])
   (:import
-    [org.eclipse.jetty.websocket.client WebSocketClient]))
+    [org.eclipse.jetty.websocket.client WebSocketClient]
+    (com.fasterxml.jackson.core JsonParseException)
+    (java.net URI)))
 
 (defn- handle-connect
-  [{:keys [debug? registrations on-call] :as instance} session]
+  [{:keys [debug? registrations on-call] :as _} session]
   (when debug?
     (log/debug "Connected to WAMP router with session" session))
   ; there might be a race condition here if we get a "welcome" message before the connect event
@@ -25,7 +27,7 @@
 (defn- handle-message
   [{:keys [debug?] :as instance} msg-str]
   (let [msg-data (try (json/decode msg-str)
-                      (catch com.fasterxml.jackson.core.JsonParseException ex
+                      (catch JsonParseException _
                         [nil nil]))]
     (when debug?
       (log/debug "WAMP message received:" msg-str))
@@ -42,7 +44,7 @@
     (connect! instance)))
 
 (defn- handle-error
-  [instance ex]
+  [_ ex]
   (log/error ex "WAMP socket error"))
 
 (defn publish!
@@ -130,10 +132,10 @@
              (ws/close socket)
              nil))))
 
-(defn create [{:keys [router-uri realm on-call] :as conf}]
+(defn create [{:keys [router-uri realm _] :as conf}]
   {:pre [(string? router-uri)
          (string? realm)]}
-  (let [client (ws/client (java.net.URI. router-uri))]
+  (let [client (ws/client (URI. router-uri))]
     (.start ^WebSocketClient client)
     (merge 
       {:debug? false

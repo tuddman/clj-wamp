@@ -7,7 +7,6 @@
     [cheshire.core :as json]
     [gniazdo.core :as ws]
     [clj-wamp.core :as core]
-    [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [message-id]]
     ))
 
@@ -81,7 +80,7 @@
          [(message-id :ERROR) request-type request-id details uri]))
 
 (defn- exception-message
-  [{:keys [debug?] :as instance} ex]
+  [{:keys [debug?] :as _} ex]
   (if debug?
     {:message (.getMessage ex)
      :stacktrace (map str (.getStackTrace ex))}

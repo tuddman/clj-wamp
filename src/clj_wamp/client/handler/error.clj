@@ -10,10 +10,10 @@
     [clj-wamp.libs.helpers :refer [finds-nested]]
     ))
 
-(defmulti handle-error (fn [instance data] (reverse-message-id (second data))))
+(defmulti handle-error (fn [_ data] (reverse-message-id (second data))))
 
 (defmethod handle-error nil
-  [instance data]
+  [_ data]
   (log/error "Error received from router" data)
   nil)
 
@@ -47,7 +47,7 @@
          (fn [[unregistered registered pending]]
            (let [req-id (nth data 2)
                  error-msg (nth data 4)
-                 [reg-id reg-uri] (get pending req-id)]
+                 [_ reg-uri] (get pending req-id)]
              (log/error "Failed to unregister RPC method:" reg-uri "with error " error-msg)
              (if (= error-msg (error-uri :no-such-registration))
                (if-let [[reg-id [_ _]] (finds-nested registered reg-uri)]

@@ -12,7 +12,8 @@
             [clj-wamp.core :refer [project-version]])
   (:import [org.httpkit.server AsyncChannel]
            [javax.crypto Mac]
-           [javax.crypto.spec SecretKeySpec]))
+           [javax.crypto.spec SecretKeySpec]
+           (com.fasterxml.jackson.core JsonParseException)))
 
 (declare send!)
 
@@ -235,14 +236,14 @@
   [sess-id topic call-id result on-after-cb]
   (let [cb-params [sess-id topic call-id result]
         cb-params (apply callback-rewrite on-after-cb cb-params)
-        [sess-id topic call-id result] cb-params]
+        [sess-id _ call-id result] cb-params]
     (send-call-result! sess-id call-id result)))
 
 (defn- call-error
   [sess-id topic call-id error on-after-cb]
   (let [cb-params [sess-id topic call-id error]
         cb-params (apply callback-rewrite on-after-cb cb-params)
-        [sess-id topic call-id error] cb-params
+        [sess-id _ call-id error] cb-params
         {err-uri :uri err-msg :message err-desc :description kill :kill} error
         err-uri (if (nil? err-uri) URI-WAMP-ERROR-GENERIC err-uri)
         err-msg (if (nil? err-msg) DESC-WAMP-ERROR-GENERIC err-msg)]
@@ -500,7 +501,7 @@
   (fn [data]
     (log/trace "Data received:" data)
     (let [[msg-type & msg-params] (try (json/decode data)
-                                    (catch com.fasterxml.jackson.core.JsonParseException ex
+                                    (catch JsonParseException _
                                       [nil nil]))
           on-call-cbs  (callbacks :on-call)
           on-sub-cbs   (callbacks :on-subscribe)

@@ -11,25 +11,25 @@
     [clj-wamp.client.callee :refer [perform-invocation register-next!]]
     ))
 
-(defmulti handle-message (fn [instance data] (reverse-message-id (first data))))
+(defmulti handle-message (fn [_ data] (reverse-message-id (first data))))
 
 (defmethod handle-message nil
-  [instance data]
+  [instance _]
   (error instance 0 0 {:message "Invalid message type"} (error-uri :bad-request)))
 
 (defmethod handle-message :WELCOME
-  [instance data]
+  [instance _]
   (println instance)
   (register-next! instance))
 
 (defmethod handle-message :ABORT
-  [instance data]
+  [instance _]
   (log/warn "Received ABORT message from router")
   (when-let [socket @(:socket instance)]
     (ws/close socket)))
 
 (defmethod handle-message :GOODBYE
-  [instance data]
+  [instance _]
   (goodbye instance {} (error-uri :goodbye-and-out))
   (when-let [socket @(:socket instance)]
     (ws/close socket)))
@@ -42,7 +42,7 @@
   (handle-error instance data))
 
 (defmethod handle-message :PUBLISHED
-  [instance data]
+  [_ _]
   nil)
 
 (defmethod handle-message :REGISTERED
