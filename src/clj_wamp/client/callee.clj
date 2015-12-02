@@ -9,7 +9,7 @@
     [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]
-    ))
+    [taoensso.timbre :as log]))
 
 
 (defn yield
@@ -46,6 +46,10 @@
 
 (defn perform-invocation
   [instance req-id rpc-fn options seq-args map-args]
+  (log/debug {:call-id req-id
+              :options options
+              :seq-args seq-args
+              :map-args map-args})
   (try
     (let [return (rpc-fn {:call-id req-id
                           :options options
@@ -53,6 +57,8 @@
                           :map-args map-args})]
       (yield-return instance req-id return))
     (catch Throwable e
+      (log/error e)
+      (exception-message instance e)
       (error instance (message-id :INVOCATION) req-id (exception-message instance e) (error-uri :internal-error)))))
 
 
@@ -68,36 +74,69 @@
 
 
 (defn register-next!
-  [instance]
+  [{:keys [debug?] :as instance}]
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
            (if-let [[reg-uri reg-fn] (first unregistered)]
              (let [req-id (core/new-rand-id)]
                (register instance req-id {} reg-uri)
                [(dissoc unregistered reg-uri) registered (assoc pending req-id [reg-uri reg-fn])])
-             [unregistered registered pending]))))
+             [unregistered registered pending])))
+  (when debug?
+    (let [[_ _ pending] @(:registrations instance)]
+      (log/debug "[register-next!] pending procedures " pending)
+      ))
+  )
 
 (defn register-new!
   "Associates the uri to the function as unregistred command. If the uri is already registred,
   it returns the existing map"
-  [instance reg-uri reg-fn]
+  [{:keys [debug?] :as instance} reg-uri reg-fn]
   (swap! (:registrations instance)
          (fn [[unregistered registered pending :as registrations]]
+           (when debug?
+             (log/debug "[register-new!] Register " reg-uri))
            (if-not (lib/contains-nested? (lib/map->vec registrations) #(= % reg-uri))
              [(assoc unregistered reg-uri reg-fn) registered pending]
-             [unregistered registered pending])
-           ))
+             [unregistered registered pending])))
+
+  (when debug?
+    (let [[unregistered _ _] @(:registrations instance)]
+      (log/debug "[register-new!] unregistered procedures " unregistered)
+      ))
+
   (register-next! instance)
   )
 
 (defn unregister!
   "Deassociates the procedure with the id and sends the unregister message to the server"
-  [instance reg-uri]
+  [{:keys [debug?] :as instance} reg-uri]
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
+           (when debug?
+             (log/debug "[unregister!] Unregister " reg-uri))
            (if-let [[reg-id [_ _]] (lib/finds-nested registered reg-uri)]
              (let [req-id (core/new-rand-id)]
                (unregister instance req-id reg-id)
                [unregistered registered (assoc pending req-id [reg-id reg-uri])])
              [unregistered registered pending])
-           )))
+           ))
+
+  (when debug?
+    (let [[_ _ pending] @(:registrations instance)]
+      (log/debug "[unregister!] pending procedures " pending)
+      )  )
+  nil)
+
+(defn unregister-by-id!
+  "Deassociates the procedure with the id and sends the unregister message to the server"
+  [instance reg-id]
+  (swap! (:registrations instance)
+         (fn [[unregistered registered pending]]
+           (if-let [reg-uri (first (get registered reg-id))]
+             (let [req-id (core/new-rand-id)]
+               (unregister instance req-id reg-id)
+               [unregistered registered (assoc pending req-id [reg-id reg-uri])])
+             [unregistered registered pending])
+           ))
+  nil)

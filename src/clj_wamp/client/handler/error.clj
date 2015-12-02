@@ -68,3 +68,14 @@
 
     (log/error "Callee was unable to process the call " error-uri))
   nil)
+
+(defmethod handle-error :SUBSCRIBE
+  []
+  "[ERROR, SUBSCRIBE, SUBSCRIBE.Request|id, Details|dict, Error|uri]"
+  nil)
+
+
+(defmethod handle-error :UNSUBSCRIBE
+  []
+  "[ERROR, UNSUBSCRIBE, UNSUBSCRIBE.Request|id, Details|dict,Error|uri]"
+  nil)

@@ -9,6 +9,7 @@
     [clj-wamp.client.handler.error :refer [handle-error]]
     [clj-wamp.libs.channels :refer [messages]]
     [clj-wamp.client.callee :refer [perform-invocation register-next!]]
+    [clj-wamp.client.subscriber :refer [subscribe-next!]]
     ))
 
 (defmulti handle-message (fn [_ data] (reverse-message-id (first data))))
@@ -19,8 +20,9 @@
 
 (defmethod handle-message :WELCOME
   [instance _]
-  (println instance)
-  (register-next! instance))
+  (register-next! instance)
+  (subscribe-next! instance)
+  )
 
 (defmethod handle-message :ABORT
   [instance _]
@@ -46,25 +48,39 @@
   nil)
 
 (defmethod handle-message :REGISTERED
-  [instance data]
+  [{:keys [debug?] :as instance} data]
   "[REGISTERED, REGISTER.Request|id, Registration|id]"
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
            (let [req-id (nth data 1)
                  reg-id (nth data 2)
                  [reg-uri reg-fn] (get pending req-id)]
+             (when debug?
+               (log/debug "Registered " reg-uri))
              [unregistered (assoc registered reg-id [reg-uri reg-fn]) (dissoc pending req-id)])))
-  (register-next! instance))
+  (when debug?
+    (let [[_ registered pending] @(:registrations instance)]
+      (log/debug "registered procedures " registered)
+      ))
+  ;(register-next! instance)
+  nil
+  )
 
 (defmethod handle-message :UNREGISTERED
-  [instance data]
+  [{:keys [debug?] :as instance} data]
   "[UNREGISTERED, UNREGISTER.Request|id]"
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
            (let [req-id (nth data 1)
-                 [reg-id _] (get pending req-id)]
+                 [reg-id reg-uri] (get pending req-id)]
+             (when debug?
+               (log/debug "Unregistered " reg-uri))
              [unregistered (dissoc registered reg-id) (dissoc pending req-id)]))
          )
+  (when debug?
+    (let [[_ registered _] @(:registrations instance)]
+      (log/debug "registered procedures " registered)
+      ))
   nil)
 
 (defmethod handle-message :INVOCATION
@@ -92,3 +108,22 @@
   (let [[_ req-id details arguments arguments-kw] data]
     (go (>! messages {:topic :RESULT :req-id req-id :details details, :arguments arguments, :arguments-kw arguments-kw})))
   )
+
+(defmethod handle-message :SUBSCRIBED
+  [instance data]
+  "[SUBSCRIBED, SUBSCRIBE.Request|id, Subscription|id]"
+  (log/debug data))
+
+
+(defmethod handle-message :UNSUBSCRIBED
+  [instance data]
+  "[UNSUBSCRIBED, UNSUBSCRIBE.Request|id]"
+  (log/debug data))
+
+
+(defmethod handle-message :EVENT
+  [instance data]
+  "[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict]
+  [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list]
+  [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
+  (log/debug data))

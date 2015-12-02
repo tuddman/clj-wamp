@@ -79,7 +79,7 @@
   (send! instance
          [(message-id :ERROR) request-type request-id details uri]))
 
-(defn- exception-message
+(defn exception-message
   [{:keys [debug?] :as _} ex]
   (if debug?
     {:message (.getMessage ex)

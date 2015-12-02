@@ -9,43 +9,18 @@
     [clj-wamp.client.v2 :as wamp]
     [clj-wamp.client.handler.messages :as hm]
     [clj-wamp.client.publisher :refer [publish]]
+    [clj-wamp.client.subscriber :as subscriber]
     [clj-wamp.client.callee :as callee]
     [clj-wamp.client.caller :as caller]
-    [clj-wamp.client.publisher :refer [publish]])
+    [clojure.core.async
+     :refer [>! <! >!! <!! go go-loop chan buffer close! thread
+             alts! alts!! timeout sub put!]])
   (:import
     [org.eclipse.jetty.websocket.client WebSocketClient]
     (com.fasterxml.jackson.core JsonParseException)
     (java.net URI)))
 
-(defn- handle-connect
-  [{:keys [debug? registrations on-call] :as _} session]
-  (when debug?
-    (log/debug "Connected to WAMP router with session" session))
-  ; there might be a race condition here if we get a "welcome" message before the connect event
-  (reset! registrations [on-call {} {}]))
 
-(defn- handle-message
-  [{:keys [debug?] :as instance} msg-str]
-  (let [msg-data (try (json/decode msg-str)
-                      (catch JsonParseException _
-                        [nil nil]))]
-    (when debug?
-      (log/debug "WAMP message received:" msg-str))
-    (hm/handle-message instance msg-data)))
-
-(declare connect!)
-
-(defn- handle-close
-  [{:keys [debug?] :as instance} code reason]
-  (when debug?
-    (log/debug "Disconnected from WAMP router:" code reason))
-  (reset! (:socket instance) nil)
-  (when @(:reconnect-state instance)
-    (connect! instance)))
-
-(defn- handle-error
-  [_ ex]
-  (log/error ex "WAMP socket error"))
 
 (defn publish!
   "Publish an event"
@@ -87,6 +62,55 @@
   "Register an procedure"
   [instance event-uri]
   (callee/unregister! instance event-uri))
+
+(defn unregister-all!
+  [instance]
+  (let [[_ registered _] @(:registrations instance)]
+    (for [reg-prod registered
+          :let [reg-id (first reg-prod)
+                reg-uri (first (get registered reg-id))]]
+      (unregister! instance reg-uri)
+      )))
+
+(defn subscribe!
+  "Subscribe to an Event"
+  [instance event-uri channel]
+  (subscriber/subscribe-new instance
+                            event-uri
+                            channel))
+
+(defn- handle-connect
+  [{:keys [debug? registrations subscriptions reg-on-call sub-on-call] :as _} session]
+  (when debug?
+    (log/debug "Connected to WAMP router with session" session))
+  ; there might be a race condition here if we get a "welcome" message before the connect event
+  (reset! registrations [reg-on-call {} {}])
+  (reset! subscriptions [sub-on-call {} {}])
+  )
+
+(defn- handle-message
+  [{:keys [debug?] :as instance} msg-str]
+  (let [msg-data (try (json/decode msg-str)
+                      (catch JsonParseException _
+                        [nil nil]))]
+    (when debug?
+      (log/debug "WAMP message received:" msg-str))
+    (hm/handle-message instance msg-data)))
+
+(declare connect!)
+
+(defn- handle-close
+  [{:keys [debug?] :as instance} code reason]
+  (when debug?
+    (log/debug "Disconnected from WAMP router:" code reason))
+  (unregister-all! instance)
+  (reset! (:socket instance) nil)
+  (when @(:reconnect-state instance)
+    (connect! instance)))
+
+(defn- handle-error
+  [_ ex]
+  (log/error ex "WAMP socket error"))
 
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
   (try 
@@ -145,4 +169,5 @@
       {:client client
        :socket (atom nil)
        :reconnect-state (atom false)
-       :registrations (atom nil)})))
+       :registrations (atom nil)
+       :subscriptions (atom nil)})))
