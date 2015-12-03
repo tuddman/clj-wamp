@@ -1,13 +1,13 @@
 (ns clj-wamp.client.handler.messages
   (:require
-    [clojure.core.async :refer [go >!]]
+    [clojure.core.async :refer [go >! <! <!! go-loop chan]]
     [taoensso.timbre :as log]
     [gniazdo.core :as ws]
     [clj-wamp.client.v2 :refer [error goodbye]]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]
-    [clj-wamp.libs.channels :refer [messages]]
+    [clj-wamp.libs.channels :refer [messages incoming-messages]]
     [clj-wamp.client.callee :refer [perform-invocation register-next!]]
     [clj-wamp.client.subscriber :refer [subscribe-next!]]
     ))
@@ -96,7 +96,7 @@
       (perform-invocation instance req-id reg-fn (nth data 3) (nth data 4 []) (nth data 5 nil))
       (error instance (message-id :INVOCATION) req-id
              {:message "Unregistered RPC"
-              :reg-id reg-id}
+              :reg-id  reg-id}
              (error-uri :no-such-registration)))))
 
 (defmethod handle-message :RESULT
@@ -110,10 +110,23 @@
   )
 
 (defmethod handle-message :SUBSCRIBED
-  [instance data]
+  [{:keys [debug?] :as instance} data]
   "[SUBSCRIBED, SUBSCRIBE.Request|id, Subscription|id]"
-  (log/debug data))
-
+  (log/debug data)
+  (swap! (:subscriptions instance)
+         (fn [[unregistered registered pending]]
+           (let [[_ req-id sub-id] data
+                 reg-uri (get pending req-id)]
+             (when debug?
+               (log/debug "Subscribed " reg-uri))
+             [unregistered (assoc registered sub-id [reg-uri (chan)]) (dissoc pending req-id)])))
+  (when debug?
+    (let [[_ registered pending] @(:registrations instance)]
+      (log/debug "registered procedures " registered)
+      ))
+  ;(register-next! instance)
+  nil
+  )
 
 (defmethod handle-message :UNSUBSCRIBED
   [instance data]
@@ -126,4 +139,18 @@
   "[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict]
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list]
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
-  (log/debug data))
+  (log/debug data)
+  (let [[_ registered _] @(:subscriptions instance)
+        [_ sub-id pub-id details arguments arguments-kw] data
+        [_ sub-channel] (get registered sub-id)]
+    (go (>! sub-channel {:arguments arguments :arguments-kw arguments-kw}))
+    ))
+
+(defn read-messages
+  [channel]
+  (loop []
+    (when-let [[instance msg] (<!! channel)]
+      (println "msg" msg)
+      )
+    (recur)))
+

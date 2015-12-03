@@ -5,6 +5,8 @@
 (def messages (chan))
 (def errors (chan))
 
+(def incoming-messages (chan))
+
 (def message-chan
   (pub messages #(:topic %)))
 

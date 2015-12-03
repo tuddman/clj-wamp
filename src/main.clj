@@ -13,7 +13,8 @@
 (def connector (w/create {:router-uri "ws://127.0.0.1:8180/ws" :realm "tour" :debug? true
                           :on-call    {"com.manager.connected"
                                        connected
-                                       }}))
+                                       }
+                          :reconnect? false}))
 
 (def connection (w/connect! connector))
 

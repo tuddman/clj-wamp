@@ -12,6 +12,7 @@
     [clj-wamp.client.subscriber :as subscriber]
     [clj-wamp.client.callee :as callee]
     [clj-wamp.client.caller :as caller]
+    [clj-wamp.libs.channels :refer [incoming-messages]]
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout sub put!]])
@@ -85,7 +86,7 @@
     (log/debug "Connected to WAMP router with session" session))
   ; there might be a race condition here if we get a "welcome" message before the connect event
   (reset! registrations [reg-on-call {} {}])
-  (reset! subscriptions [sub-on-call {} {}])
+  (reset! subscriptions [(chan 1) {} (chan 1)])
   )
 
 (defn- handle-message
