@@ -112,26 +112,34 @@
 (defmethod handle-message :SUBSCRIBED
   [{:keys [debug?] :as instance} data]
   "[SUBSCRIBED, SUBSCRIBE.Request|id, Subscription|id]"
-  (log/debug data)
-  (swap! (:subscriptions instance)
-         (fn [[unregistered registered pending]]
-           (let [[_ req-id sub-id] data
-                 reg-uri (get pending req-id)]
-             (when debug?
-               (log/debug "Subscribed " reg-uri))
-             [unregistered (assoc registered sub-id [reg-uri (chan)]) (dissoc pending req-id)])))
+  (let [{:keys [registered pending]} @(:subscriptions instance)
+        [_ _ sub-id] data
+        [_ reg-uri] (<!! pending)]
+    (when debug?
+      (log/debug "Subscribed " sub-id reg-uri))
+
+		(swap! registered assoc sub-id [reg-uri (chan)]))
   (when debug?
-    (let [[_ registered pending] @(:registrations instance)]
+    (let [{:keys [registered pending]} @(:subscriptions instance)]
       (log/debug "registered procedures " registered)
       ))
-  ;(register-next! instance)
-  nil
   )
 
 (defmethod handle-message :UNSUBSCRIBED
-  [instance data]
+  [{:keys [debug?] :as instance} data]
   "[UNSUBSCRIBED, UNSUBSCRIBE.Request|id]"
-  (log/debug data))
+  (let [{:keys [registered pending]} @(:subscriptions instance)
+        [_ _ req-id] data
+        [sub-id reg-uri] (<!! pending)]
+    (when debug?
+      (log/debug "Unsubscribed " sub-id reg-uri))
+
+    (swap! registered dissoc sub-id))
+
+  (when debug?
+    (let [{:keys [registered pending]} @(:subscriptions instance)]
+      (log/debug "registered procedures " registered)
+      )))
 
 
 (defmethod handle-message :EVENT
@@ -139,18 +147,9 @@
   "[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict]
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list]
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
-  (log/debug data)
-  (let [[_ registered _] @(:subscriptions instance)
+  (let [{:keys [registered]} @(:subscriptions instance)
         [_ sub-id pub-id details arguments arguments-kw] data
         [_ sub-channel] (get registered sub-id)]
     (go (>! sub-channel {:arguments arguments :arguments-kw arguments-kw}))
     ))
-
-(defn read-messages
-  [channel]
-  (loop []
-    (when-let [[instance msg] (<!! channel)]
-      (println "msg" msg)
-      )
-    (recur)))
 

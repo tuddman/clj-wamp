@@ -70,12 +70,14 @@
   nil)
 
 (defmethod handle-error :SUBSCRIBE
-  []
+  [_ data]
   "[ERROR, SUBSCRIBE, SUBSCRIBE.Request|id, Details|dict, Error|uri]"
-  nil)
+  (let [[_ _ req-id details error-uri] data]
+  (log/error "Callee was unable to subscribe " error-uri)))
 
 
 (defmethod handle-error :UNSUBSCRIBE
-  []
-  "[ERROR, UNSUBSCRIBE, UNSUBSCRIBE.Request|id, Details|dict,Error|uri]"
-  nil)
+	[_ data]
+	"[ERROR, UNSUBSCRIBE, UNSUBSCRIBE.Request|id, Details|dict,Error|uri]"
+	(let [[_ _ req-id details error-uri] data]
+		(log/error "Callee was unable to unsubscribe " error-uri)))

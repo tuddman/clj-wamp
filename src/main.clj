@@ -24,6 +24,10 @@
   (+ x y)
   )
 
+(def subscriptions @(:subscriptions connection))
+(def unreg-subs (:unregistered subscriptions))
+(def pending-subs (:pending subscriptions))
+
 ;(dotimes [n 10] (w/register! connector (str "com.tourviewer.test" n) add))
 
 

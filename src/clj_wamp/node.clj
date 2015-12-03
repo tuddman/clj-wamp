@@ -60,7 +60,7 @@
                                    (apply event-fn seq-args)))))
 
 (defn unregister!
-  "Register an procedure"
+  "Unregister an procedure"
   [instance event-uri]
   (callee/unregister! instance event-uri))
 
@@ -75,10 +75,22 @@
 
 (defn subscribe!
   "Subscribe to an Event"
-  [instance event-uri channel]
-  (subscriber/subscribe-new instance
-                            event-uri
-                            channel))
+  [instance event-uri]
+  (subscriber/subscribe-new! instance event-uri))
+
+(defn unsubscribe!
+  "Unsubscribe of an Event"
+  [instance event-uri]
+  (subscriber/unsubscribe! instance event-uri))
+
+(defn unsubscribe-all!
+	[instance]
+	(let [{:keys [registered]} @(:subscriptions instance)]
+		(for [reg-sub @registered
+					:let [reg-id (first reg-sub)
+								reg-uri (first (get @registered reg-id))]]
+			(unsubscribe! instance reg-uri)
+			)))
 
 (defn- handle-connect
   [{:keys [debug? registrations subscriptions reg-on-call sub-on-call] :as _} session]
@@ -86,7 +98,12 @@
     (log/debug "Connected to WAMP router with session" session))
   ; there might be a race condition here if we get a "welcome" message before the connect event
   (reset! registrations [reg-on-call {} {}])
-  (reset! subscriptions [(chan 1) {} (chan 1)])
+  (reset! subscriptions {:unregistered (chan)
+												 :pending      (chan)
+												 :registered   (atom nil)
+												 })
+	(if-not (nil? sub-on-call)
+		(put! (:unregistered subscriptions) sub-on-call))
   )
 
 (defn- handle-message
@@ -104,7 +121,12 @@
   [{:keys [debug?] :as instance} code reason]
   (when debug?
     (log/debug "Disconnected from WAMP router:" code reason))
-  (unregister-all! instance)
+	(try
+		(unregister-all! instance)
+		(unsubscribe-all! instance)
+		(catch Exception e
+			(log/error "Unable to unregister/unsubscribe on close " e)))
+
   (reset! (:socket instance) nil)
   (when @(:reconnect-state instance)
     (connect! instance)))
@@ -114,7 +136,7 @@
   (log/error ex "WAMP socket error"))
 
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
-  (try 
+  (try
     (swap! (:socket instance)
            (fn [socket]
              (when (nil? socket)
@@ -148,7 +170,12 @@
         instance))))
 
 (defn disconnect! [{:keys [debug?] :as instance}]
-  (reset! (:reconnect-state instance) false)  
+  (reset! (:reconnect-state instance) false)
+	(try
+		(unregister-all! instance)
+		(unsubscribe-all! instance)
+		(catch Exception e
+			(log/error "Unable to unregister/unsubscribe on close " e)))
   (swap! (:socket instance)
          (fn [socket]
            (when (some? socket)
@@ -162,7 +189,7 @@
          (string? realm)]}
   (let [client (ws/client (URI. router-uri))]
     (.start ^WebSocketClient client)
-    (merge 
+    (merge
       {:debug? false
        :reconnect? true
        :reconnect-wait-ms 10000}
@@ -171,4 +198,7 @@
        :socket (atom nil)
        :reconnect-state (atom false)
        :registrations (atom nil)
-       :subscriptions (atom nil)})))
+			 :subscriptions (atom {:unregistered (chan)
+														 :pending      (chan)
+														 :registered   (atom nil)
+														 })})))
