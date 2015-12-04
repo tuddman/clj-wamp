@@ -75,8 +75,8 @@
 
 (defn subscribe!
   "Subscribe to an Event"
-  [instance event-uri]
-  (subscriber/subscribe-new! instance event-uri))
+  [instance event-uri event-chan]
+  (subscriber/subscribe-new! instance event-uri event-chan))
 
 (defn unsubscribe!
   "Unsubscribe of an Event"
@@ -93,17 +93,21 @@
 			)))
 
 (defn- handle-connect
-  [{:keys [debug? registrations subscriptions reg-on-call sub-on-call] :as _} session]
+  [{:keys [debug? registrations subscriptions reg-on-call sub-on-call] :as instance} session]
   (when debug?
     (log/debug "Connected to WAMP router with session" session))
   ; there might be a race condition here if we get a "welcome" message before the connect event
   (reset! registrations [reg-on-call {} {}])
   (reset! subscriptions {:unregistered (chan)
-												 :pending      (chan)
-												 :registered   (atom nil)
-												 })
-	(if-not (nil? sub-on-call)
-		(put! (:unregistered subscriptions) sub-on-call))
+                         :pending      (chan)
+                         :registered   (atom nil)
+                         })
+
+  (dotimes [n (count sub-on-call)]
+    (let [[reg-uri event-chan] (nth sub-on-call n)
+          req-id (core/new-rand-id)]
+      (put! (:unregistered @subscriptions) [req-id reg-uri event-chan])))
+
   )
 
 (defn- handle-message

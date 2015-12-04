@@ -114,14 +114,14 @@
   "[SUBSCRIBED, SUBSCRIBE.Request|id, Subscription|id]"
   (let [{:keys [registered pending]} @(:subscriptions instance)
         [_ _ sub-id] data
-        [_ reg-uri] (<!! pending)]
+        [_ reg-uri event-chan] (<!! pending)]
     (when debug?
       (log/debug "Subscribed " sub-id reg-uri))
 
-		(swap! registered assoc sub-id [reg-uri (chan)]))
+		(swap! registered assoc sub-id [reg-uri event-chan]))
   (when debug?
     (let [{:keys [registered pending]} @(:subscriptions instance)]
-      (log/debug "registered procedures " registered)
+      (log/debug "registered procedures " @registered)
       ))
   )
 
@@ -138,18 +138,21 @@
 
   (when debug?
     (let [{:keys [registered pending]} @(:subscriptions instance)]
-      (log/debug "registered procedures " registered)
+      (log/debug "registered procedures " @registered)
       )))
 
 
 (defmethod handle-message :EVENT
-  [instance data]
+  [{:keys [debug?] :as instance} data]
   "[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict]
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list]
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
   (let [{:keys [registered]} @(:subscriptions instance)
         [_ sub-id pub-id details arguments arguments-kw] data
-        [_ sub-channel] (get registered sub-id)]
+        [_ sub-channel] (get @registered sub-id)]
+    (when debug?
+      (log/debug "Message EVENT" sub-id sub-channel))
+
     (go (>! sub-channel {:arguments arguments :arguments-kw arguments-kw}))
     ))
 

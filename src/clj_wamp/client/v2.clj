@@ -46,12 +46,12 @@
                           :progressive_call_results true
                           }
                          }
-            ;:subscriber {:features
-            ;             {
-            ;              :caller_identification    true
-            ;              :progressive_call_results true
-            ;              }
-            ;             }
+            :subscriber {:features
+                         {
+                          :caller_identification    true
+                          :progressive_call_results true
+                          }
+                         }
             :publisher
                         {:features
                          {

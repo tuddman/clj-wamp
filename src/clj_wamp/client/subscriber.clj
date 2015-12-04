@@ -32,21 +32,22 @@
     (when debug?
       (log/debug "[subscribe-next!] Register " unregistered))
 		(go-loop []
-			(let [[sub-id reg-uri] (<! unregistered)]
-				(put! pending [sub-id reg-uri])
+			(let [[sub-id reg-uri event-chan] (<! unregistered)]
+				(put! pending [sub-id reg-uri event-chan])
 				(when debug?
 					(log/debug "[subscribe-next!] Subscribing " sub-id reg-uri))
 				(subscribe instance sub-id {} reg-uri)
 				(recur)))))
 
 (defn subscribe-new!
-	[{:keys [debug? subscriptions] :as instance} reg-uri]
+	[{:keys [debug? subscriptions] :as instance} reg-uri event-chan]
 	(let [{:keys [unregistered registered]} @subscriptions]
 		(when debug?
 			(log/debug "[subscribe-new] Register " reg-uri))
 		(if-not (lib/contains-nested? registered #(= % reg-uri))
 			(let [req-id (core/new-rand-id)]
-				(go (>! unregistered [req-id reg-uri]))))))
+				(go (>! unregistered [req-id reg-uri event-chan])))
+      )))
 
 (defn unsubscribe!
 	"Deassociates the procedure with the id and sends the unregister message to the server"
