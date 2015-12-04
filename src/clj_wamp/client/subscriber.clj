@@ -55,7 +55,7 @@
 	(let [{:keys [registered pending]} @subscriptions]
 		(when debug?
 			(log/debug "[unsubscribe!] Unsubscribe " reg-uri))
-		(if-let [[reg-id [_ _]] (lib/finds-nested @registered reg-uri)]
+		(if-let [[reg-id [_ _]] (contains? @registered reg-uri)]
 			(let [req-id (core/new-rand-id)]
 				(put! pending [reg-id reg-uri])
 				(unsubscribe instance req-id reg-id)

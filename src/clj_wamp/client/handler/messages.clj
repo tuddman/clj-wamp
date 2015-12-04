@@ -6,6 +6,7 @@
     [clj-wamp.client.v2 :refer [error goodbye]]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
+    [clj-wamp.libs.helpers :as lib]
     [clj-wamp.client.handler.error :refer [handle-error]]
     [clj-wamp.libs.channels :refer [messages incoming-messages]]
     [clj-wamp.client.callee :refer [perform-invocation register-next!]]
@@ -118,7 +119,7 @@
     (when debug?
       (log/debug "Subscribed " sub-id reg-uri))
 
-		(swap! registered assoc sub-id [reg-uri event-chan]))
+		(swap! registered assoc reg-uri [sub-id  event-chan]))
   (when debug?
     (let [{:keys [registered pending]} @(:subscriptions instance)]
       (log/debug "registered procedures " @registered)
@@ -134,7 +135,7 @@
     (when debug?
       (log/debug "Unsubscribed " sub-id reg-uri))
 
-    (swap! registered dissoc sub-id))
+    (swap! registered dissoc reg-uri))
 
   (when debug?
     (let [{:keys [registered pending]} @(:subscriptions instance)]
@@ -149,7 +150,7 @@
   [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
   (let [{:keys [registered]} @(:subscriptions instance)
         [_ sub-id pub-id details arguments arguments-kw] data
-        [_ sub-channel] (get @registered sub-id)]
+        [_ [_ sub-channel]] (lib/finds-nested @registered sub-id)]
     (when debug?
       (log/debug "Message EVENT" sub-id sub-channel))
 
