@@ -196,7 +196,8 @@
     (merge
       {:debug? false
        :reconnect? true
-       :reconnect-wait-ms 10000}
+       :reconnect-wait-ms 10000
+       :authenticate? false}
       conf
       {:client client
        :socket (atom nil)

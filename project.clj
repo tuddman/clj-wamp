@@ -12,7 +12,8 @@
                  [org.clojure/data.codec "0.1.0"]
                  [http-kit "2.1.18"]
                  [cheshire "5.5.0"]
-                 [stylefruits/gniazdo "0.4.1"]]
+                 [stylefruits/gniazdo "0.4.1"]
+                 [pandect "0.5.4"]]
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
              :dev {:dependencies [[log4j "1.2.17" :exclusions [javax.mail/mail
                                                                javax.jms/jms

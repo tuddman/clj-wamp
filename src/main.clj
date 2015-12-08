@@ -10,11 +10,27 @@
   [_]
   "Connected")
 
-(def connector (w/create {:router-uri "ws://127.0.0.1:8180/ws" :realm "tour" :debug? true
-                          :on-call    {"com.manager.connected"
-                                       connected
-                                       }
-                          :reconnect? false}))
+(defn authenticate
+  [& args]
+  (println "Authenticate " args)
+  true
+  )
+
+(def connector (w/create {:router-uri  "ws://127.0.0.1:8280" :realm "tour" :debug? true
+                          :reg-on-call {"com.manager.connected"
+                                        connected
+                                        }
+
+                          :sub-on-call [["wamp.session.on_join" (chan 1)]
+                                        ["wamp.session.on_leave" (chan 1)]
+                                        ]
+                          :reconnect?  false
+                          :authenticate? true
+                          :auth-details {
+                                         :authid "authenticator1"
+                                         :authmethods ["wampcra"]
+                                         :secret "secret123"
+                                         }}))
 
 (def connection (w/connect! connector))
 

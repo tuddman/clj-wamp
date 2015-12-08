@@ -11,6 +11,7 @@
     [clj-wamp.libs.channels :refer [messages incoming-messages]]
     [clj-wamp.client.callee :refer [perform-invocation register-next!]]
     [clj-wamp.client.subscriber :refer [subscribe-next!]]
+    [clj-wamp.client.auth :refer [handle-authenticate]]
     ))
 
 (defmulti handle-message (fn [_ data] (reverse-message-id (first data))))
@@ -18,6 +19,15 @@
 (defmethod handle-message nil
   [instance _]
   (error instance 0 0 {:message "Invalid message type"} (error-uri :bad-request)))
+
+(defmethod handle-message :CHALLENGE
+  [{:keys [debug?] :as instance} data]
+  "[CHALLENGE, AuthMethod|string, Extra|dict]"
+  (let [[_ auth-method extra] data]
+    (when debug?
+      (log/debug "WAMP challenge received:" auth-method extra))
+
+    (handle-authenticate instance auth-method extra)))
 
 (defmethod handle-message :WELCOME
   [instance _]
@@ -119,7 +129,7 @@
     (when debug?
       (log/debug "Subscribed " sub-id reg-uri))
 
-		(swap! registered assoc reg-uri [sub-id  event-chan]))
+		(swap! registered assoc reg-uri [sub-id event-chan]))
   (when debug?
     (let [{:keys [registered pending]} @(:subscriptions instance)]
       (log/debug "registered procedures " @registered)

@@ -26,40 +26,42 @@
 
 (defn hello
   "[HELLO, Realm|uri, Details|dict]"
-  [instance]
+  [{:keys [debug? authenticate?] :as instance}]
   (send! instance
          [(message-id :HELLO)
           (:realm instance)
-          {:roles
-           {:callee     {:features
-                         {
-                          :caller_identification      true
-                          :pattern_based_registration true
-                          :progressive_call_results   true
-                          :registration_revocation    true
-                          :shared_registration        true
-                          }
-                         }
-            :caller     {:features
-                         {
-                          :caller_identification    true
-                          :progressive_call_results true
-                          }
-                         }
-            :subscriber {:features
-                         {
-                          :caller_identification    true
-                          :progressive_call_results true
-                          }
-                         }
-            :publisher
-                        {:features
-                         {
-                          :subscriber_blackwhite_listing true
-                          :publisher_exclusion           true
-                          :publisher_identification      true
-                          }
-                         }}}]))
+          (merge {:roles
+                  {:callee     {:features
+                                {
+                                 :caller_identification      true
+                                 :pattern_based_registration true
+                                 :progressive_call_results   true
+                                 :registration_revocation    true
+                                 :shared_registration        true
+                                 }
+                                }
+                   :caller     {:features
+                                {
+                                 :caller_identification    true
+                                 :progressive_call_results true
+                                 }
+                                }
+                   :subscriber {:features
+                                {
+                                 :caller_identification    true
+                                 :progressive_call_results true
+                                 }
+                                }
+                   :publisher
+                               {:features
+                                {
+                                 :subscriber_blackwhite_listing true
+                                 :publisher_exclusion           true
+                                 :publisher_identification      true
+                                 }
+                                }}}
+                 (if authenticate?
+                   (apply dissoc (:secret instance) [:on-challenge])))]))
 
 (defn abort
   "[ABORT, Details|dict, Reason|uri]"
