@@ -4,7 +4,7 @@
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
     [clj-wamp.core :as core]
-    [clj-wamp.client.v2 :refer [send! error exception-message]]
+    [clj-wamp.client.v2 :refer [send! error exception-message exception-stacktrace]]
     [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
@@ -29,7 +29,7 @@
   [instance req-id return]
   (if-let [return-error (:error return)]
     (let [return-error-uri (if (:uri return-error) (:uri return-error) (error-uri :application-error))]
-      (error instance (message-id :INVOCATION) req-id (dissoc return-error :uri) return-error-uri))
+      (error instance [(message-id :INVOCATION) req-id {} return-error-uri [(:message return-error)]]))
     (cond
       (:result return) (yield instance req-id (merge {} (:options return)) [(:result return)] nil)
       (:seq-result return) (yield instance req-id (merge {} (:options return)) (vec (:seq-result return)) nil)
@@ -46,10 +46,6 @@
 
 (defn perform-invocation
   [instance req-id rpc-fn options seq-args map-args]
-  (log/debug {:call-id req-id
-              :options options
-              :seq-args seq-args
-              :map-args map-args})
   (try
     (let [return (rpc-fn {:call-id req-id
                           :options options
@@ -57,9 +53,10 @@
                           :map-args map-args})]
       (yield-return instance req-id return))
     (catch Throwable e
-      (log/error e)
-      (exception-message instance e)
-      (error instance (message-id :INVOCATION) req-id (exception-message instance e) (error-uri :internal-error)))))
+      (if-let [cause (.getCause e)]
+        (error instance [(message-id :INVOCATION) req-id {} (.getMessage cause) [(exception-message instance e)] (exception-stacktrace instance e)])
+        (error instance [(message-id :INVOCATION) req-id {} (error-uri :internal-error) [(exception-message instance e)] (exception-stacktrace instance e)]))))
+  )
 
 
 (defn register

@@ -18,9 +18,10 @@
 
 (defn send!
   [{:keys [debug?] :as instance} msg-data]
-  (let [json-str (json/encode msg-data)]
-    (when debug?
-      (log/debug "Sending WAMP message" json-str))
+  (let [json-str (json/encode (remove nil? msg-data))]
+    ;(when debug?
+      (log/debug "Sending WAMP message" json-str)
+    ;)
     (when-let [socket @(:socket instance)]
       (ws/send-msg socket json-str))))
 
@@ -61,7 +62,7 @@
                                  }
                                 }}}
                  (if authenticate?
-                   (apply dissoc (:secret instance) [:on-challenge])))]))
+                   (apply dissoc (:auth-details instance) [:secret])))]))
 
 (defn abort
   "[ABORT, Details|dict, Reason|uri]"
@@ -77,14 +78,19 @@
  "[ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri]
   [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list]
   [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]" 
-  [instance request-type request-id details uri]
+  [instance data]
+  (let [[request-type request-id details uri arguments arguments-kw] data]
   (send! instance
-         [(message-id :ERROR) request-type request-id details uri]))
+         [(message-id :ERROR) request-type request-id details uri arguments arguments-kw])))
 
 (defn exception-message
   [{:keys [debug?] :as _} ex]
   (if debug?
-    {:message (.getMessage ex)
-     :stacktrace (map str (.getStackTrace ex))}
-    {:message "Application error"}))
+    (.getMessage ex)
+    "Application error"))
+
+(defn exception-stacktrace
+  [{:keys [debug?] :as _} ex]
+  (if debug?
+    {:stacktrace (map str (.getStackTrace ex))}))
 

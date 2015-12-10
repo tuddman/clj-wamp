@@ -18,7 +18,7 @@
 
 (defmethod handle-message nil
   [instance _]
-  (error instance 0 0 {:message "Invalid message type"} (error-uri :bad-request)))
+  (error instance [0 0 {} (error-uri :bad-request) ["Invalid message type"]]))
 
 (defmethod handle-message :CHALLENGE
   [{:keys [debug?] :as instance} data]
@@ -105,10 +105,11 @@
         [_ reg-fn] (get registered reg-id)]
     (if (some? reg-fn)
       (perform-invocation instance req-id reg-fn (nth data 3) (nth data 4 []) (nth data 5 nil))
-      (error instance (message-id :INVOCATION) req-id
-             {:message "Unregistered RPC"
-              :reg-id  reg-id}
-             (error-uri :no-such-registration)))))
+      (error instance [(message-id :INVOCATION) req-id
+                       {}
+                       (error-uri :no-such-registration)
+                       ["Unregistered RPC"]
+                       {:reg-id reg-id}]))))
 
 (defmethod handle-message :RESULT
   [_ data]
