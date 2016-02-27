@@ -21,15 +21,6 @@
   [msg-keyword]
   (get wamp2/message-id-table msg-keyword))
 
-(def ^:const TYPE-ID-PREFIX      (message-id :HELLO)) ; Client-to-server (Aux)
-(def ^:const TYPE-ID-CALL        (message-id :CALL)) ; Client-to-server (RPC)
-(def ^:const TYPE-ID-CALLRESULT  (message-id :RESULT)) ; Server-to-client (RPC)
-(def ^:const TYPE-ID-CALLERROR   (message-id :ERROR)) ; Server-to-client (RPC)
-(def ^:const TYPE-ID-SUBSCRIBE   (message-id :SUBSCRIBE)) ; Client-to-server (PubSub)
-(def ^:const TYPE-ID-UNSUBSCRIBE (message-id :UNSUBSCRIBE)) ; Client-to-server (PubSub)
-(def ^:const TYPE-ID-PUBLISH     (message-id :PUBLISH)) ; Client-to-server (PubSub)
-(def ^:const TYPE-ID-EVENT       (message-id :EVENT)) ; Server-to-client (PubSub)
-
 ; Predefined URIs
 (def ^:const wamp-error-uri-table
   {:invalid-uri "wamp.error.invalid_uri"
@@ -75,12 +66,20 @@
 (def client-topics (ref {}))
 (def topic-clients (ref {}))
 
+
+(defn send-subscribed!
+  "Sends a WAMP SUBSCRIBED message to a websocket client.
+         [SUBSCRIBED, SUBSCRIBE.Request|id, Subscription|id]"
+  [sess-id request-id subscription-id]
+  (core/send! sess-id (message-id :SUBSCRIBED) request-id subscription-id))
+
 (defn topic-subscribe
   "Subscribes a websocket session to a topic."
-  [topic sess-id]
+  [topic sess-id request-id]
   (dosync
     (alter topic-clients assoc-in [topic sess-id] true)
-    (alter client-topics assoc-in [sess-id topic] true)))
+    (alter client-topics assoc-in [sess-id topic] true))
+  (send-subscribed! sess-id request-id topic))
 
 (defn topic-unsubscribe
   "Unsubscribes a websocket session from a topic."
@@ -111,10 +110,14 @@
   to a topic."
   [topic includes & data]
   (let [includes (if (sequential? includes) includes [includes])]
+    (println "topic-emit! clients" @topic-clients)
+
     (dosync
-      (doseq [[sess-id _] (@topic-clients topic)]
-        (if (some #{sess-id} includes)
-          (apply core/send! sess-id data))))))
+      (let [clients   (@topic-clients topic)]
+        (println "topic-emit! clients" clients)
+        (doseq [[sess-id _] clients]
+          (if (some #{sess-id} includes)
+            (apply core/send! sess-id data)))))))
 
 (defn get-topic-clients [topic]
   "Returns all client session ids within a topic."
@@ -146,6 +149,7 @@
                 ;:callee {}
                 }}))
 
+
 (defn send-abort!
   "Sends an ABORT message to abort opening a session."
   [sess-id details-dict reason-uri]
@@ -174,9 +178,14 @@
 
 (defn send-event!
   "Sends an event message to all clients in topic.
-  [ TYPE_ID_EVENT , topicURI , event ]"
+     [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id,
+          Details|dict]
+     [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id,
+          Details|dict, PUBLISH.Arguments|list]
+     [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id,
+          Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
   [topic event]
-  (topic-send! topic (message-id :EVENT) topic event))
+  (topic-send! topic (message-id :EVENT) topic {} [] event))
 
 (defn broadcast-event!
   "Sends an event message to all clients in a topic but those excluded."
@@ -186,7 +195,7 @@
 (defn emit-event!
   "Sends an event message to specific clients in a topic"
   [topic event includes]
-    (topic-emit! topic includes (message-id :EVENT) topic event))
+    (topic-emit! topic includes (message-id :EVENT) topic {} [] event))
 
 ;; WAMP callbacks
 
@@ -217,6 +226,7 @@
   (let [cb-params [sess-id topic call-id result]
         cb-params (apply callback-rewrite on-after-cb cb-params)
         [sess-id topic call-id result] cb-params]
+    (println "call-success" result)
     (send-call-result! sess-id call-id result)))
 
 (defn- call-error
@@ -414,6 +424,7 @@
             rpc-result  (binding [*call-sess-id* sess-id]  ; bind optional sess-id
                           (println "server.on-call apply" rpc-cb call-params-list)
                           (apply rpc-cb call-params-list))      ; use fn's own arg signature
+            _         (println "rpc-result" rpc-result)
             error      (:error  rpc-result)
             result     (:result rpc-result)]
         (if (and (nil? error) (nil? result))
@@ -446,13 +457,16 @@
           mv)))))
 
 (defn- on-subscribe
-  [callbacks sess-id topic]
+  [callbacks sess-id topic request-id]
   (dosync
     (when (nil? (get-in @topic-clients [topic sess-id]))
+      (println "on-subscribe" topic callbacks)
       (when-let [topic-cb (map-key-or-prefix callbacks topic)]
+        (println "on-subscribe topic-cb" topic-cb)
+
         (when (or (true? topic-cb) (topic-cb sess-id topic))
           (let [on-after-cb (callbacks :on-after)]
-            (topic-subscribe topic sess-id)
+            (topic-subscribe topic sess-id request-id)
             (when (fn? on-after-cb)
               (on-after-cb sess-id topic))))))))
 
@@ -496,40 +510,6 @@
    (nth arguments 4) ; list args
    (nth arguments 5)]) ; kw args
 
-;(defn- handle-message
-;  [sess-id callbacks data-seq]
-;  (let [[msg-type & msg-params] data-seq
-;        on-call-cbs  (callbacks :on-call)
-;        on-sub-cbs   (callbacks :on-subscribe)
-;        on-unsub-cb  (callbacks :on-unsubscribe)
-;        on-pub-cbs   (callbacks :on-publish)
-;        perm-cb      (get-in callbacks [:on-auth :permissions])]
-;    (println "\nLLLOOOGGG" "handle-message" msg-type msg-params)
-;    (condp = msg-type
-;
-;      (message-id :HELLO) (send-welcome! sess-id)
-;
-;      (message-id :GOODBYE)
-;      (send-goodbye! sess-id (nth msg-params 1) (nth msg-params 2))
-;
-;      ; [INVOCATION, Request|id, REGISTERED.Registration|id, Details|dict]
-;      ; [INVOCATION, Request|id, REGISTERED.Registration|id, Details|dict, CALL.Arguments|list]
-;      ; [INVOCATION, Request|id, REGISTERED.Registration|id, Details|dict, CALL.Arguments|list, CALL.ArgumentsKw|dict]
-;      (message-id :INVOCATION)
-;      (when (map? on-call-cbs)
-;        (let [[call-id call-opts topic-uri call-params call-kw-params] msg-params
-;              topic (core/get-topic sess-id topic-uri)]
-;          (if (or (nil? perm-cb)
-;                  ;(= URI-WAMP-CALL-AUTHREQ topic)
-;                  ;(= URI-WAMP-CALL-AUTH topic)
-;                  (authorized? sess-id :rpc topic perm-cb))
-;            (on-call on-call-cbs sess-id topic call-id call-opts call-params call-kw-params)
-;            (call-error sess-id topic call-id
-;                              {:uri (wamp-error-uri :not-authorized) :message "Access denied"}
-;                              (on-call-cbs :on-after-error)))))
-;
-;    )))
-
 
 (defn- on-message
   "Handles all http-kit messages. parses the incoming data as json
@@ -549,13 +529,17 @@
       (println "\nLLLOOOGGG" "on-message msg-params:" msg-params)
       (case msg-type
 
-        1 ;TYPE-ID-PREFIX
+        1 ;HELLO
         (do
           (println "HELLO")
           (send-welcome! sess-id)
         )
 
-        48 ;TYPE-ID-CALL
+        48 ;CALL
+          ; "[CALL, Request|id, Options|dict, Procedure|uri]
+          ;  [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
+          ;  [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list, ArgumentsKw|dict]"
+
         (if (map? on-call-cbs)
           (let [[call-id call-opts topic-uri call-params & call-kw-params] msg-params
                 topic (core/get-topic sess-id topic-uri)]
@@ -568,24 +552,28 @@
                 {:uri URI-WAMP-ERROR-NOAUTH :message DESC-WAMP-ERROR-NOAUTH}
                 (on-call-cbs :on-after-error)))))
 
-        32 ;TYPE-ID-SUBSCRIBE
+        32 ;SUBSCRIBE
         ;        [713845233, {}, "com.myapp.mytopic1"]
 
-        (let [details   (second msg-params)
+        (let [request-id (first msg-params)
+              details   (second msg-params)
               topic-uri (nth msg-params 2)
               topic     (core/get-topic sess-id topic-uri)]
           (println "SUBSCRIBE " topic)
+          (println "SUBSCRIBE " request-id)
+          (println "SUBSCRIBE " perm-cb)
+          (println "SUBSCRIBE (authorized? sess-id :subscribe topic perm-cb)" (authorized? sess-id :subscribe topic perm-cb))
           (if (or (nil? perm-cb) (authorized? sess-id :subscribe topic perm-cb))
-            (on-subscribe on-sub-cbs sess-id topic)))
+            (on-subscribe on-sub-cbs sess-id topic request-id)))
 
-        34 ;TYPE-ID-UNSUBSCRIBE
+        34 ;UNSUBSCRIBE
         (let [topic (core/get-topic sess-id (first msg-params))]
           (dosync
             (when (true? (get-in @topic-clients [topic sess-id]))
               (topic-unsubscribe topic sess-id)
               (when (fn? on-unsub-cb) (on-unsub-cb sess-id topic)))))
 
-        16 ;TYPE-ID-PUBLISH
+        16 ;PUBLISH
         (let [[topic-uri event & pub-args] msg-params
               topic (core/get-topic sess-id topic-uri)]
           (if (or (nil? perm-cb) (authorized? sess-id :publish topic perm-cb))
@@ -744,6 +732,8 @@
     (some #{proto}
       (map #(lower-case (trim %))
         (split protocols #",")))))
+
+
 
 (defmacro with-channel-validation
   "Replaces the HTTP Kit `with-channel` macro. Does extra validation

@@ -8,6 +8,13 @@
 
 (def subprotocol-id "wamp.2.json")
 
+(comment
+  https://tools.ietf.org/html/draft-oberstet-hybi-tavendo-wamp-02
+
+
+
+  )
+
 (def ^:const message-id-table
   {:HELLO 1
    :WELCOME 2
@@ -38,7 +45,7 @@
   [msg-keyword]
   (get message-id-table msg-keyword))
 
-(defn invert-map 
+(defn invert-map
   [dict]
   (into {} (map (fn [[k v]] [v k]) dict)))
 
@@ -108,7 +115,7 @@
 (defn error
  "[ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri]
   [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list]
-  [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]" 
+  [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]"
   [instance request-type request-id details uri]
   (send! instance
          [(message-id :ERROR) request-type request-id details uri]))
@@ -178,7 +185,7 @@
 
 (defn- perform-invocation
   [instance req-id rpc-fn options seq-args map-args]
-  (try 
+  (try
     (let [return (rpc-fn {:call-id req-id
                           :options options
                           :seq-args seq-args
@@ -221,7 +228,7 @@
   [instance data]
   (register-next! instance))
 
-(defmethod handle-message :ABORT 
+(defmethod handle-message :ABORT
   [instance data]
   (log/warn "Received ABORT message from router")
   (when-let [socket @(:socket instance)]
@@ -237,7 +244,7 @@
   [instance data]
   "[ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri]
    [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list]
-   [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]" 
+   [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]"
   (handle-error instance data))
 
 (defmethod handle-message :PUBLISHED
@@ -266,7 +273,28 @@
         reg-fn (get registered reg-id)]
     (if (some? reg-fn)
       (perform-invocation instance req-id reg-fn (nth data 3) (nth data 4 []) (nth data 5 nil))
-      (error instance (message-id :INVOCATION) req-id 
+      (error instance (message-id :INVOCATION) req-id
              {:message "Unregistered RPC"
               :reg-id reg-id}
              (error-uri :no-such-registration)))))
+
+
+; (defmethod handle-message :CALL
+;   [instance data]
+;   "[CALL, Request|id, Options|dict, Procedure|uri]
+;    [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
+;    [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list, ArgumentsKw|dict]"
+;   (let [[_ registered _] @(:registrations instance)
+;         req-id (nth data 1)
+;         reg-id (nth data 2)
+;         reg-fn (get registered reg-id)]
+;     (if (some? reg-fn)
+;       (perform-invocation instance req-id reg-fn (nth data 3) (nth data 4 []) (nth data 5 nil))
+;       (error instance (message-id :INVOCATION) req-id
+;              {:message "Unregistered RPC"
+;               :reg-id reg-id}
+;              (error-uri :no-such-registration)))))
+
+
+
+
