@@ -78,7 +78,7 @@
 (defn send!
   [{:keys [debug?] :as instance} msg-data]
   (let [json-str (json/encode msg-data)]
-    (when debug?
+    (when true ; debug?
       (log/debug "Sending WAMP message" json-str))
     (when-let [socket @(:socket instance)]
       (ws/send-msg socket json-str))))
@@ -150,7 +150,7 @@
 
 (defn- exception-message
   [{:keys [debug?] :as instance} ex]
-  (if debug?
+  (if true ; debug?
     {:message (.getMessage ex)
      :stacktrace (map str (.getStackTrace ex))}
     {:message "Application error"}))
