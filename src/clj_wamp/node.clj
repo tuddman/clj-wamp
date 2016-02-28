@@ -55,7 +55,7 @@
   (wamp/publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
 
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
-  (try 
+  (try
     (swap! (:socket instance)
            (fn [socket]
              (when (nil? socket)
@@ -89,7 +89,7 @@
         instance))))
 
 (defn disconnect! [{:keys [debug?] :as instance}]
-  (reset! (:reconnect-state instance) false)  
+  (reset! (:reconnect-state instance) false)
   (swap! (:socket instance)
          (fn [socket]
            (when (some? socket)
@@ -103,7 +103,7 @@
          (string? realm)]}
   (let [client (ws/client (java.net.URI. router-uri))]
     (.start ^WebSocketClient client)
-    (merge 
+    (merge
       {:debug? false
        :reconnect? true
        :reconnect-wait-ms 10000}
