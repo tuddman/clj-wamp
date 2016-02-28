@@ -166,7 +166,7 @@
    [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list]
    [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list, YIELD.ArgumentsKw|dict]"
   [sess-id call-id result]
-  (core/send! sess-id (message-id :RESULT) call-id result))
+  (core/send! sess-id (message-id :RESULT) call-id {} result {}))
 
 (defn send-error!
   "Sends a WAMP call error message to a websocket client.
