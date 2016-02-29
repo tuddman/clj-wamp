@@ -277,24 +277,3 @@
              {:message "Unregistered RPC"
               :reg-id reg-id}
              (error-uri :no-such-registration)))))
-
-
-; (defmethod handle-message :CALL
-;   [instance data]
-;   "[CALL, Request|id, Options|dict, Procedure|uri]
-;    [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
-;    [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list, ArgumentsKw|dict]"
-;   (let [[_ registered _] @(:registrations instance)
-;         req-id (nth data 1)
-;         reg-id (nth data 2)
-;         reg-fn (get registered reg-id)]
-;     (if (some? reg-fn)
-;       (perform-invocation instance req-id reg-fn (nth data 3) (nth data 4 []) (nth data 5 nil))
-;       (error instance (message-id :INVOCATION) req-id
-;              {:message "Unregistered RPC"
-;               :reg-id reg-id}
-;              (error-uri :no-such-registration)))))
-
-
-
-

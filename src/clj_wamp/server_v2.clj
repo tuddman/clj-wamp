@@ -10,28 +10,10 @@
             [clojure.tools.logging :as log]
             [clojure.data.codec.base64 :as base64]
             [clj-wamp.core :as core]
-            [clj-wamp.v2 :as wamp2]
-            [gniazdo.core :as ws])
+            [clj-wamp.v2 :as wamp2])
   (:import [org.httpkit.server AsyncChannel]
            [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec]))
-
-
-; v1
-(def ^:const URI-WAMP-BASE            "http://api.wamp.ws/")
-(def ^:const URI-WAMP-ERROR           (str URI-WAMP-BASE "error#"))
-(def ^:const URI-WAMP-PROCEDURE       (str URI-WAMP-BASE "procedure#"))
-(def ^:const URI-WAMP-CALL-AUTHREQ    (str URI-WAMP-PROCEDURE "authreq"))
-(def ^:const URI-WAMP-CALL-AUTH       (str URI-WAMP-PROCEDURE "auth"))
-(def ^:const URI-WAMP-TOPIC           (str URI-WAMP-BASE "topic#"))
-(def ^:const URI-WAMP-ERROR-GENERIC   (str URI-WAMP-ERROR "generic"))
-(def ^:const DESC-WAMP-ERROR-GENERIC  "generic error")
-(def ^:const URI-WAMP-ERROR-INTERNAL  (str URI-WAMP-ERROR "internal"))
-(def ^:const DESC-WAMP-ERROR-INTERNAL "internal error")
-(def ^:const URI-WAMP-ERROR-NOTFOUND  (str URI-WAMP-ERROR "notfound"))
-(def ^:const DESC-WAMP-ERROR-NOTFOUND "not found error")
-(def ^:const DESC-WAMP-ERROR-NOAUTH   "unauthorized")
-(def ^:const URI-WAMP-ERROR-NOAUTH    (str URI-WAMP-ERROR "unauthorized"))
 
 ;; Topic utils
 
@@ -82,11 +64,8 @@
   to a topic."
   [topic includes & data]
   (let [includes (if (sequential? includes) includes [includes])]
-    (println "topic-emit! clients" @topic-clients)
-
     (dosync
       (let [clients   (@topic-clients topic)]
-        (println "topic-emit! clients" clients)
         (doseq [[sess-id _] clients]
           (if (some #{sess-id} includes)
             (apply core/send! sess-id data)))))))
@@ -97,18 +76,6 @@
     (keys clients)))
 
 ;; WAMP websocket send! utils
-
-(defn- send!
-  "Sends data to a websocket client."
-  [sess-id & data]
-  (dosync
-    (let [channel-or-fn (core/get-client-channel sess-id)
-          json-data     (json/encode data {:escape-non-ascii true})]
-      (println "\nLLLOOOGGG" "Sending data:" data)
-      (if (fn? channel-or-fn) ; application callback?
-        (channel-or-fn data)
-        (when channel-or-fn
-          (httpkit/send! channel-or-fn json-data))))))
 
 (defn send-welcome!
   "Sends a WAMP welcome message to a websocket client.
@@ -183,7 +150,7 @@
   "Clean up clients and topics upon disconnect."
   [sess-id close-cb unsub-cb]
   (fn [status]
-    (println "on-close")
+    (println "#### on-close")
     (when (fn? close-cb) (close-cb sess-id status))
     (doseq [topic (dosync
                     (if-let [sess-topics (@client-topics sess-id)]
@@ -199,7 +166,6 @@
   (let [cb-params [sess-id topic call-id result]
         cb-params (apply callback-rewrite on-after-cb cb-params)
         [sess-id topic call-id result] cb-params]
-    (println "call-success" result)
     (send-call-result! sess-id call-id result)))
 
 (defn- call-error
@@ -361,8 +327,9 @@
           secret-cb   (auth-cbs :secret)
           perm-cb     (auth-cbs :permissions)]
       (merge-with merge callbacks
-        {:on-call {URI-WAMP-CALL-AUTHREQ (create-call-authreq allow-anon? secret-cb)
-                   URI-WAMP-CALL-AUTH    (create-call-auth perm-cb callbacks)}}))
+        ; {:on-call {URI-WAMP-CALL-AUTHREQ (create-call-authreq allow-anon? secret-cb)
+        ;            URI-WAMP-CALL-AUTH    (create-call-auth perm-cb callbacks)}}))
+        {}))
     callbacks))
 
 (defn- auth-timeout
@@ -387,7 +354,6 @@
 (defn- on-call
   "Handle WAMP call (RPC) messages"
   [callbacks sess-id topic call-id call-opts call-params call-kw-params]
-  (println "server.on-call " callbacks sess-id topic call-id call-opts call-params call-kw-params)
   (if-let [rpc-cb (callbacks topic)]
     (try
       (let [call-params-list  [call-kw-params]
@@ -395,9 +361,7 @@
             cb-params         (apply callback-rewrite (callbacks :on-before) cb-params)
             [sess-id topic call-id call-params-list]  cb-params
             rpc-result  (binding [*call-sess-id* sess-id]  ; bind optional sess-id
-                          (println "server.on-call apply" rpc-cb call-params-list)
                           (apply rpc-cb call-params-list))      ; use fn's own arg signature
-            _         (println "rpc-result" rpc-result)
             error      (:error  rpc-result)
             result     (:result rpc-result)]
         (if (and (nil? error) (nil? result))
@@ -433,9 +397,7 @@
   [callbacks sess-id topic request-id]
   (dosync
     (when (nil? (get-in @topic-clients [topic sess-id]))
-      (println "on-subscribe" topic callbacks)
       (when-let [topic-cb (map-key-or-prefix callbacks topic)]
-        (println "on-subscribe topic-cb" topic-cb)
 
         (when (or (true? topic-cb) (topic-cb sess-id topic))
           (let [on-after-cb (callbacks :on-after)]
@@ -470,24 +432,6 @@
             (when (fn? on-after-cb)
               (on-after-cb sess-id topic event exclude eligible))))))))
 
-; (defn registration-id
-;   [uri]
-;   (hash uri))
-
-; (defn- call->call
-;   [arguments]
-;   [(message-id :INVOCATION)
-;    (nth arguments 1) ; request id
-;    (registration-id (nth arguments 3)) ; uri
-;    (nth arguments 2) ; options
-;    (nth arguments 4) ; list args
-;    (nth arguments 5)]) ; kw args
-
-
-
-; (defmulti handle-message
-;   (fn [instance msg-type msg-params]
-;     (println "handle-message multi" instance msg-type msg-params)))
 (defmulti handle-message (fn [instance msg-type msg-params] (wamp2/reverse-message-id msg-type)))
 
 (defmethod handle-message nil
@@ -498,8 +442,15 @@
 (defmethod handle-message :HELLO
   [instance msg-type msg-params]
   (do
-    (println "handle-message :HELLO" instance msg-type msg-params)
     (send-welcome! (:sess-id instance))
+  ))
+
+(defmethod handle-message :GOODBYE
+  [instance msg-type msg-params]
+       ; [GOODBYE, Details|dict, Reason|uri]
+  (do
+    (println "handle-message :GOODBYE" msg-params)
+    (core/close-channel (:sess-id instance))
   ))
 
 (defmethod handle-message :CALL
@@ -508,7 +459,6 @@
         callbacks     (:callbacks-map instance)
         perm-cb       (get-in callbacks [:on-auth :permissions])
         on-call-cbs   (:on-call callbacks)]
-    (println "handle-message :CALL" instance msg-type msg-params)
     ; "[CALL, Request|id, Options|dict, Procedure|uri]
     ;  [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
     ;  [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list, ArgumentsKw|dict]"
@@ -517,12 +467,13 @@
       (let [[call-id call-opts topic-uri call-params & call-kw-params] msg-params
             topic (core/get-topic sess-id topic-uri)]
         (if (or (nil? perm-cb)
-                (= URI-WAMP-CALL-AUTHREQ topic)
-                (= URI-WAMP-CALL-AUTH topic)
+                ; (= URI-WAMP-CALL-AUTHREQ topic)
+                ; (= URI-WAMP-CALL-AUTH topic)
                 (authorized? sess-id :rpc topic perm-cb))
           (apply on-call on-call-cbs sess-id topic call-id call-opts call-params call-kw-params)
           (call-error sess-id topic call-id
-            {:uri URI-WAMP-ERROR-NOAUTH :message DESC-WAMP-ERROR-NOAUTH}
+            ; {:uri URI-WAMP-ERROR-NOAUTH :message DESC-WAMP-ERROR-NOAUTH}
+            {:uri (wamp2/error-uri :not-authorized) :message (wamp2/error-uri :not-authorized)}
             (on-call-cbs :on-after-error)))))
 ))
 
@@ -534,17 +485,12 @@
         callbacks     (:callbacks-map instance)
         perm-cb       (get-in callbacks [:on-auth :permissions])
         on-sub-cbs    (:on-subscribe callbacks)]
-    (println "handle-message :SUBSCRIBE" instance msg-type msg-params)
      ; [SUBSCRIBE, Request|id, Options|dict, Topic|uri]
 
     (let [request-id (first msg-params)
           details   (second msg-params)
           topic-uri (nth msg-params 2)
           topic     (core/get-topic sess-id topic-uri)]
-      (println "SUBSCRIBE " topic)
-      (println "SUBSCRIBE " request-id)
-      (println "SUBSCRIBE " perm-cb)
-      (println "SUBSCRIBE (authorized? sess-id :subscribe topic perm-cb)" (authorized? sess-id :subscribe topic perm-cb))
       (if (or (nil? perm-cb) (authorized? sess-id :subscribe topic perm-cb))
         (on-subscribe on-sub-cbs sess-id topic request-id)))
 ))
@@ -555,7 +501,6 @@
   (let [sess-id       (:sess-id instance)
         callbacks     (:callbacks-map instance)
         on-unsub-cb   (:on-unsubscribe callbacks)]
-    (println "handle-message :UNSUBSCRIBE" instance msg-type msg-params)
      ; [UNSUBSCRIBE, Request|id, SUBSCRIBED.Subscription|id]
 
     (let [topic (core/get-topic sess-id (first msg-params))]
@@ -571,7 +516,6 @@
         callbacks     (:callbacks-map instance)
         perm-cb       (get-in callbacks [:on-auth :permissions])
         on-pub-cbs    (:on-publish callbacks)]
-    (println "handle-message :PUBLISH" instance msg-type msg-params)
      ; [PUBLISH, Request|id, Options|dict, Topic|uri]
      ; [PUBLISH, Request|id, Options|dict, Topic|uri, Arguments|list]
      ; [PUBLISH, Request|id, Options|dict, Topic|uri, Arguments|list,
@@ -588,9 +532,9 @@
     (let [[msg-type & msg-params] (try (json/decode msg-str)
                                     (catch com.fasterxml.jackson.core.JsonParseException ex
                                       [nil nil]))]
-      (println "handle-json-message:" msg-str)
-      (println "handle-json-message msg-type:" msg-type)
-      (println "handle-json-message msg-params:" msg-params)
+      ; (println "handle-json-message:" msg-str)
+      ; (println "handle-json-message msg-type:" msg-type)
+      ; (println "handle-json-message msg-params:" msg-params)
       (handle-message instance msg-type msg-params))))
 
 (defn- create-instance [sess-id callbacks-map]
@@ -709,21 +653,13 @@
         cb-on-open    (callbacks-map :on-open)
         sess-id       (core/add-client channel)
         instance      (create-instance sess-id callbacks-map)]
-    (println "\nLLLOOOGGG" "http-kit-handler cb-on-open" cb-on-open)
-    (println "\nLLLOOOGGG" "http-kit-handler AsyncChannel/websocket?"
-        (httpkit/websocket? channel))
-    (println "\nLLLOOOGGG" "http-kit-handler AsyncChannel/open?"
-        (httpkit/open? channel))
 
     (httpkit/on-close channel   (on-close sess-id
                                   (callbacks-map :on-close)
                                   (callbacks-map :on-unsubscribe)))
-    ; (httpkit/on-receive channel (on-message sess-id callbacks-map))
     (httpkit/on-receive channel (handle-json-message instance))
-    ; (send-welcome! sess-id)
     (when (fn? cb-on-open) (cb-on-open sess-id))
     (init-auth-timer callbacks-map sess-id)
-    (println "\nLLLOOOGGG" "http-kit-handler sess-id" sess-id)
     sess-id))
 
 
@@ -764,7 +700,6 @@
          (if (origin-match? ~origin-re ~request)
            (if (subprotocol? wamp2/subprotocol-id ~request)
              (do
-               (println "\nLLLOOOGGG" "sendHandshake" ~ch-name)
                (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
                  {"Upgrade"                "websocket"
                   "Connection"             "Upgrade"
