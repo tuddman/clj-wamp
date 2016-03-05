@@ -396,8 +396,10 @@
 (defn- on-subscribe
   [callbacks sess-id topic request-id]
   (dosync
+    (println "on-subscribe" @topic-clients topic)
     (when (nil? (get-in @topic-clients [topic sess-id]))
       (when-let [topic-cb (map-key-or-prefix callbacks topic)]
+        (println "on-subscribe topic-cb" topic-cb)
 
         (when (or (true? topic-cb) (topic-cb sess-id topic))
           (let [on-after-cb (callbacks :on-after)]
@@ -412,13 +414,13 @@
 
 (defn- on-publish
   "Handles WAMP publish messages, sending event messages back out
-  to clients subscribed to the topic.
-  [ TYPE_ID_PUBLISH , topicURI , event [, exclude [, eligible ]]"
+  to clients subscribed to the topic."
   ([callbacks sess-id topic event]
     (on-publish callbacks sess-id topic event false nil))
   ([callbacks sess-id topic event exclude]
     (on-publish callbacks sess-id topic event exclude nil))
   ([callbacks sess-id topic event exclude eligible]
+    (println "on-publish" topic event exclude eligible)
     (when-let [pub-cb (map-key-or-prefix callbacks topic)]
       (let [cb-params [sess-id topic event exclude eligible]
             cb-params (apply callback-rewrite pub-cb cb-params)
@@ -432,11 +434,15 @@
             (when (fn? on-after-cb)
               (on-after-cb sess-id topic event exclude eligible))))))))
 
-(defmulti handle-message (fn [instance msg-type msg-params] (wamp2/reverse-message-id msg-type)))
+(defmulti handle-message
+  (fn [instance msg-type msg-params]
+    (let [type-code (wamp2/reverse-message-id msg-type)]
+      (println "handle-message" msg-type msg-params type-code)
+      type-code)))
 
 (defmethod handle-message nil
   [instance msg-type msg-params]
-  (println "handle-message nil" instance msg-type msg-params))
+  (println "handle-message nil" msg-type msg-params))
   ; (error instance 0 0 {:message "Invalid message type"} (error-uri :bad-request)))
 
 (defmethod handle-message :HELLO
@@ -491,6 +497,8 @@
           details   (second msg-params)
           topic-uri (nth msg-params 2)
           topic     (core/get-topic sess-id topic-uri)]
+      (println "SUBSCRIBE" request-id details topic-uri topic)
+      (println "SUBSCRIBE (authorized? sess-id :subscribe topic perm-cb)" (authorized? sess-id :subscribe topic perm-cb))
       (if (or (nil? perm-cb) (authorized? sess-id :subscribe topic perm-cb))
         (on-subscribe on-sub-cbs sess-id topic request-id)))
 ))
@@ -503,7 +511,9 @@
         on-unsub-cb   (:on-unsubscribe callbacks)]
      ; [UNSUBSCRIBE, Request|id, SUBSCRIBED.Subscription|id]
 
-    (let [topic (core/get-topic sess-id (first msg-params))]
+    (println "handle-message :UNSUBSCRIBE" msg-type msg-params on-unsub-cb)
+    (let [request-id  (first msg-params)
+          topic (core/get-topic sess-id (second msg-params))]
       (dosync
         (when (true? (get-in @topic-clients [topic sess-id]))
           (topic-unsubscribe topic sess-id)
@@ -521,10 +531,11 @@
      ; [PUBLISH, Request|id, Options|dict, Topic|uri, Arguments|list,
      ;     ArgumentsKw|dict]
 
-    (let [[topic-uri event & pub-args] msg-params
+    (let [[request-id options topic-uri & pub-args] msg-params
           topic (core/get-topic sess-id topic-uri)]
+      (println "handle-message :PUBLISH" request-id topic-uri pub-args)
       (if (or (nil? perm-cb) (authorized? sess-id :publish topic perm-cb))
-        (apply on-publish on-pub-cbs sess-id topic event pub-args)))))
+        (apply on-publish on-pub-cbs sess-id topic pub-args)))))
 
 
 (defn- handle-json-message [instance]
@@ -532,9 +543,9 @@
     (let [[msg-type & msg-params] (try (json/decode msg-str)
                                     (catch com.fasterxml.jackson.core.JsonParseException ex
                                       [nil nil]))]
-      ; (println "handle-json-message:" msg-str)
-      ; (println "handle-json-message msg-type:" msg-type)
-      ; (println "handle-json-message msg-params:" msg-params)
+      (println "handle-json-message:" msg-str)
+      (println "handle-json-message msg-type:" msg-type)
+      (println "handle-json-message msg-params:" msg-params)
       (handle-message instance msg-type msg-params))))
 
 (defn- create-instance [sess-id callbacks-map]

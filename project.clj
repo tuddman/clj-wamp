@@ -9,7 +9,7 @@
                  [org.clojure/core.incubator "0.1.2"]
                  [org.clojure/tools.logging "0.2.6"]
                  [org.clojure/data.codec "0.1.0"]
-                 [http-kit "2.1.5"]
+                 [http-kit "2.1.21-alpha2"]  ; "2.1.5"]
                  [cheshire "5.2.0"]
                  [stylefruits/gniazdo "0.4.0"]]
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
