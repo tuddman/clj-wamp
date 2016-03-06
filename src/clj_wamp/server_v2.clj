@@ -150,7 +150,6 @@
   "Clean up clients and topics upon disconnect."
   [sess-id close-cb unsub-cb]
   (fn [status]
-    (println "#### on-close")
     (when (fn? close-cb) (close-cb sess-id status))
     (doseq [topic (dosync
                     (if-let [sess-topics (@client-topics sess-id)]
@@ -353,12 +352,14 @@
 
 (defn- on-call
   "Handle WAMP call (RPC) messages"
-  [callbacks sess-id topic call-id call-opts call-params call-kw-params]
+  [callbacks sess-id topic call-id call-opts call-params] ; call-kw-params]
+  ; (println "on-call:" callbacks sess-id topic call-id call-opts call-params)
   (if-let [rpc-cb (callbacks topic)]
     (try
-      (let [call-params-list  [call-kw-params]
+      (let [call-params-list  call-params
             cb-params         [sess-id topic call-id call-params-list]
             cb-params         (apply callback-rewrite (callbacks :on-before) cb-params)
+            ; _ (println "on-call cb-params2" cb-params)
             [sess-id topic call-id call-params-list]  cb-params
             rpc-result  (binding [*call-sess-id* sess-id]  ; bind optional sess-id
                           (apply rpc-cb call-params-list))      ; use fn's own arg signature
@@ -376,7 +377,7 @@
            :message "Internal error"
            :description (.getMessage e)}
           (callbacks :on-after-error))
-        (println "\nLLLOOOGGG" "RPC Exception:" topic call-params call-kw-params e)))
+        (println "\nLLLOOOGGG" "RPC Exception:" topic call-params e)))
     (call-error sess-id topic call-id
       {:uri (wamp2/error-uri :no-such-procedure)
        :message (str "No such procedure: '" topic "'")}
@@ -396,10 +397,10 @@
 (defn- on-subscribe
   [callbacks sess-id topic request-id]
   (dosync
-    (println "on-subscribe" @topic-clients topic)
+    ; (println "on-subscribe" @topic-clients topic)
     (when (nil? (get-in @topic-clients [topic sess-id]))
       (when-let [topic-cb (map-key-or-prefix callbacks topic)]
-        (println "on-subscribe topic-cb" topic-cb)
+        ; (println "on-subscribe topic-cb" topic-cb)
 
         (when (or (true? topic-cb) (topic-cb sess-id topic))
           (let [on-after-cb (callbacks :on-after)]
@@ -437,13 +438,14 @@
 (defmulti handle-message
   (fn [instance msg-type msg-params]
     (let [type-code (wamp2/reverse-message-id msg-type)]
-      (println "handle-message" msg-type msg-params type-code)
+      ; (println "handle-message" msg-type msg-params type-code)
       type-code)))
 
 (defmethod handle-message nil
   [instance msg-type msg-params]
-  (println "handle-message nil" msg-type msg-params))
-  ; (error instance 0 0 {:message "Invalid message type"} (error-uri :bad-request)))
+  ; (println "handle-message nil" msg-type msg-params)
+  (send-error! (:sess-id instance) 0 {:message "Invalid message type"} (wamp2/error-uri :bad-request)))
+
 
 (defmethod handle-message :HELLO
   [instance msg-type msg-params]
@@ -455,7 +457,7 @@
   [instance msg-type msg-params]
        ; [GOODBYE, Details|dict, Reason|uri]
   (do
-    (println "handle-message :GOODBYE" msg-params)
+    ; (println "handle-message :GOODBYE" msg-params)
     (core/close-channel (:sess-id instance))
   ))
 
@@ -469,14 +471,22 @@
     ;  [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list]
     ;  [CALL, Request|id, Options|dict, Procedure|uri, Arguments|list, ArgumentsKw|dict]"
 
+    ; (println "handle-message :CALL" msg-params)
+
     (if (map? on-call-cbs)
-      (let [[call-id call-opts topic-uri call-params & call-kw-params] msg-params
+      (let [[call-id call-opts topic-uri & call-params] msg-params
+            call-kw-params    {}
             topic (core/get-topic sess-id topic-uri)]
+        ; (println "handle-message :CALL topic-uri" topic-uri)
+        ; (println "handle-message :CALL call-params" call-params)
+        ; (println "handle-message :CALL perm-cb" perm-cb)
         (if (or (nil? perm-cb)
                 ; (= URI-WAMP-CALL-AUTHREQ topic)
                 ; (= URI-WAMP-CALL-AUTH topic)
                 (authorized? sess-id :rpc topic perm-cb))
-          (apply on-call on-call-cbs sess-id topic call-id call-opts call-params call-kw-params)
+          (do
+            (apply on-call on-call-cbs sess-id topic call-id call-opts call-params call-kw-params)
+          )
           (call-error sess-id topic call-id
             ; {:uri URI-WAMP-ERROR-NOAUTH :message DESC-WAMP-ERROR-NOAUTH}
             {:uri (wamp2/error-uri :not-authorized) :message (wamp2/error-uri :not-authorized)}
@@ -497,8 +507,8 @@
           details   (second msg-params)
           topic-uri (nth msg-params 2)
           topic     (core/get-topic sess-id topic-uri)]
-      (println "SUBSCRIBE" request-id details topic-uri topic)
-      (println "SUBSCRIBE (authorized? sess-id :subscribe topic perm-cb)" (authorized? sess-id :subscribe topic perm-cb))
+      ; (println "SUBSCRIBE" request-id details topic-uri topic)
+      ; (println "SUBSCRIBE (authorized? sess-id :subscribe topic perm-cb)" (authorized? sess-id :subscribe topic perm-cb))
       (if (or (nil? perm-cb) (authorized? sess-id :subscribe topic perm-cb))
         (on-subscribe on-sub-cbs sess-id topic request-id)))
 ))
@@ -511,7 +521,7 @@
         on-unsub-cb   (:on-unsubscribe callbacks)]
      ; [UNSUBSCRIBE, Request|id, SUBSCRIBED.Subscription|id]
 
-    (println "handle-message :UNSUBSCRIBE" msg-type msg-params on-unsub-cb)
+    ; (println "handle-message :UNSUBSCRIBE" msg-type msg-params on-unsub-cb)
     (let [request-id  (first msg-params)
           topic (core/get-topic sess-id (second msg-params))]
       (dosync
@@ -533,7 +543,7 @@
 
     (let [[request-id options topic-uri & pub-args] msg-params
           topic (core/get-topic sess-id topic-uri)]
-      (println "handle-message :PUBLISH" request-id topic-uri pub-args)
+      ; (println "handle-message :PUBLISH" request-id topic-uri pub-args)
       (if (or (nil? perm-cb) (authorized? sess-id :publish topic perm-cb))
         (apply on-publish on-pub-cbs sess-id topic pub-args)))))
 
@@ -543,9 +553,9 @@
     (let [[msg-type & msg-params] (try (json/decode msg-str)
                                     (catch com.fasterxml.jackson.core.JsonParseException ex
                                       [nil nil]))]
-      (println "handle-json-message:" msg-str)
-      (println "handle-json-message msg-type:" msg-type)
-      (println "handle-json-message msg-params:" msg-params)
+      ; (println "handle-json-message:" msg-str)
+      ; (println "handle-json-message msg-type:" msg-type)
+      ; (println "handle-json-message msg-params:" msg-params)
       (handle-message instance msg-type msg-params))))
 
 (defn- create-instance [sess-id callbacks-map]

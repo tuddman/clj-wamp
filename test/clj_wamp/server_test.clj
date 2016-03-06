@@ -11,8 +11,8 @@
 (def ^:const TYPE-ID-WELCOME      (v2/message-id :WELCOME))
 (def ^:const TYPE-ID-PREFIX       (v2/message-id :PREFIX))
 (def ^:const TYPE-ID-CALL         (v2/message-id :CALL))
-(def ^:const TYPE-ID-CALLRESULT   (v2/message-id :CALLRESULT))
-(def ^:const TYPE-ID-CALLERROR    (v2/message-id :CALLERROR))
+(def ^:const TYPE-ID-CALLRESULT   (v2/message-id :RESULT))
+(def ^:const TYPE-ID-CALLERROR    (v2/message-id :ERROR))
 (def ^:const TYPE-ID-SUBSCRIBE    (v2/message-id :SUBSCRIBE))
 (def ^:const TYPE-ID-UNSUBSCRIBE  (v2/message-id :UNSUBSCRIBE))
 (def ^:const TYPE-ID-PUBLISH      (v2/message-id :PUBLISH))
@@ -315,7 +315,6 @@
          (msg-received? [TYPE-ID-WELCOME, sess-id, {:version core/project-version, :roles {:dealer {}}}])
 
          ; Pub/Sub Events
-         ; (@send (json/encode [TYPE-ID-PREFIX, "request-id", {}, "event", evt-base-url]))
          (@send (json/encode [TYPE-ID-SUBSCRIBE, "request-id", {}, (evt-url "chat")]))
          (is (subscribed? sess-id (evt-url "chat")))
          (is (after-sub?  sess-id (evt-url "chat")))
@@ -369,55 +368,58 @@
          (is (after-pub? sess-id (evt-url "no-handler") "no-handler-event"))
          (msg-received? [TYPE-ID-EVENT, (evt-url "no-handler"), {}, [], "no-handler-event"])
 
-         ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "request-id", {}, "event:none"]))
-         ; (is (subscribed? nil nil))
-         ; (is (after-sub?  nil nil))
-         ; (@send (json/encode [TYPE-ID-PUBLISH, "request-id", {}, "event:none", "no-event"]))
-         ; (is (published? nil nil nil))
-         ; (is (after-pub? nil nil nil))
-         ; (msg-received? nil)
+         (@send (json/encode [TYPE-ID-SUBSCRIBE, "request-id", {}, "event:none"]))
+         (is (subscribed? nil nil))
+         (is (after-sub?  nil nil))
+         (@send (json/encode [TYPE-ID-PUBLISH, "request-id", {}, "event:none", "no-event"]))
+         (is (published? nil nil nil))
+         (is (after-pub? nil nil nil))
+         (msg-received? nil)
 
          ; ; RPC Messaging
-         ; (@send (json/encode [TYPE-ID-PREFIX, "request-id", {}, "api", rpc-base-url]))
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "short-rpc", "api:add", 23, 99]))
-         ; (is (rpc-before-call? sess-id (rpc-url "add") "short-rpc"))
-         ; (is (rpc-after-call-success? sess-id (rpc-url "add") "short-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "short-rpc", 122])
+         (@send (json/encode [TYPE-ID-CALL, "short-rpc", {}, (rpc-url "add"), 23, 99]))
+         (is (rpc-before-call? sess-id (rpc-url "add") "short-rpc"))
+         (is (rpc-after-call-success? sess-id (rpc-url "add") "short-rpc"))
+         (msg-received? [TYPE-ID-CALLRESULT, "short-rpc", {} [] {:result 122}])
 
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "full-rpc", "http://example.com/api#add", 1, 2]));
-         ; (is (rpc-before-call? sess-id (rpc-url "add") "full-rpc"))
-         ; (is (rpc-after-call-success? sess-id (rpc-url "add") "full-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "full-rpc", 3])
+         (@send (json/encode [TYPE-ID-CALL, "full-rpc", {}, "http://example.com/api#add", 1, 2]));
+         (is (rpc-before-call? sess-id (rpc-url "add") "full-rpc"))
+         (is (rpc-after-call-success? sess-id (rpc-url "add") "full-rpc"))
+         (msg-received? [TYPE-ID-CALLRESULT "full-rpc" {} [] {:result 3}])
 
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "as-is-rpc", "api:subtract", 13, 7]))
-         ; (is (rpc-before-call? sess-id (rpc-url "subtract") "as-is-rpc"))
-         ; (is (rpc-after-call-success? sess-id (rpc-url "subtract") "as-is-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "as-is-rpc", 6])
+         (@send (json/encode [TYPE-ID-CALL, "as-is-rpc", {}, (rpc-url "subtract"), 13, 7]))
+         (is (rpc-before-call? sess-id (rpc-url "subtract") "as-is-rpc"))
+         (is (rpc-after-call-success? sess-id (rpc-url "subtract") "as-is-rpc"))
+         (msg-received? [TYPE-ID-CALLRESULT, "as-is-rpc", {}, [], 6])
 
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "sess-id-rpc", "api:sess-id"]))
-         ; (is (rpc-before-call? sess-id (rpc-url "sess-id") "sess-id-rpc"))
-         ; (is (rpc-after-call-success? sess-id (rpc-url "sess-id") "sess-id-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "sess-id-rpc", sess-id])
+         (@send (json/encode [TYPE-ID-CALL, "sess-id-rpc", {}, (rpc-url "sess-id")]))
+         (is (rpc-before-call? sess-id (rpc-url "sess-id") "sess-id-rpc"))
+         (is (rpc-after-call-success? sess-id (rpc-url "sess-id") "sess-id-rpc"))
+         (msg-received? [TYPE-ID-CALLRESULT, "sess-id-rpc", {}, [], {:result sess-id}])
 
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "exception-rpc", "api:add", 23, "abc"]))
-         ; (is (rpc-before-call? sess-id (rpc-url "add") "exception-rpc"))
-         ; (is (rpc-after-call-error? sess-id (rpc-url "add") "exception-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "exception-rpc",
-         ;                 "http://api.wamp.ws/error#internal",
-         ;                 "internal error" "java.lang.String cannot be cast to java.lang.Number"])
+         (@send (json/encode [TYPE-ID-CALL, "exception-rpc", {}, (rpc-url "add"), 23, "abc"]))
+         (is (rpc-before-call? sess-id (rpc-url "add") "exception-rpc"))
+         (is (rpc-after-call-error? sess-id (rpc-url "add") "exception-rpc"))
+         (msg-received? [TYPE-ID-CALLERROR, "exception-rpc",
+                          {:message "Internal error",
+                           :description "java.lang.String cannot be cast to java.lang.Number"
+                          }, "wamp.error.internal-error"])
 
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "error-rpc", "api:give-error", 1, 2]))
-         ; (is (rpc-before-call? sess-id (rpc-url "give-error") "error-rpc"))
-         ; (is (rpc-after-call-error? sess-id (rpc-url "give-error") "error-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "error-rpc",
-         ;                 "http://example.com/error#give-error",
-         ;                 "Test error" "Test error description"])
+         (@send (json/encode [TYPE-ID-CALL, "error-rpc", {}, (rpc-url "give-error"), 1, 2]))
+         (is (rpc-before-call? sess-id (rpc-url "give-error") "error-rpc"))
+         (is (rpc-after-call-error? sess-id (rpc-url "give-error") "error-rpc"))
+         (msg-received? [TYPE-ID-CALLERROR, "error-rpc",
+                          {:message "Test error",
+                           :description "Test error description"
+                          }, "http://example.com/error#give-error"])
 
-         ; (@send (json/encode [TYPE-ID-CALL, "request-id", {}, "not-found-rpc", "api:not-found", 1, 2]))
-         ; (is (rpc-before-call? nil nil nil))        ; callback only run on existing calls
-         ; (is (rpc-after-call-error? sess-id (rpc-url "not-found") "not-found-rpc"))
-         ; (msg-received? [TYPE-ID-CALLRESULT, "not-found-rpc",
-         ;                 "http://api.wamp.ws/error#notfound", "not found error"])
+         (@send (json/encode [TYPE-ID-CALL, "not-found-rpc", {}, (rpc-url "not-found"), 1, 2]))
+         (is (rpc-before-call? nil nil nil))        ; callback only run on existing calls
+         (is (rpc-after-call-error? sess-id (rpc-url "not-found") "not-found-rpc"))
+         (msg-received? [TYPE-ID-CALLERROR, "not-found-rpc",
+                          {:description nil,
+                           :message "No such procedure: 'http://example.com/api#not-found'"
+                          }, "wamp.error.no_such_procedure"])
 
          ; ; Test invalid data
          ; (@send "{asdadas}}asadasdasda{{{aasdas")
@@ -497,7 +499,7 @@
            ; Test RPC/PubSub Authorization
            ; permission allowed for add
            (@send (json/encode [TYPE-ID-PREFIX, "api", rpc-base-url]))
-           (@send (json/encode [TYPE-ID-CALL, "add-rpc", "api:add", 23, 99]))
+           (@send (json/encode [TYPE-ID-CALL, "add-rpc", (rpc-url "add"), 23, 99]))
            (msg-received? [TYPE-ID-CALLRESULT, "add-rpc", 122])
            ; permission denied for sub
            (@send (json/encode [TYPE-ID-CALL, "sub-rpc", "api:sub", 122, 99]))
