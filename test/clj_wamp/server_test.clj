@@ -8,6 +8,8 @@
             [clj-wamp.server-v2 :refer :all]))
 
 (def ^:const TYPE-ID-HELLO        (v2/message-id :HELLO))
+(def ^:const TYPE-ID-CHALLENGE    (v2/message-id :CHALLENGE))
+(def ^:const TYPE-ID-AUTHENTICATE (v2/message-id :AUTHENTICATE))
 (def ^:const TYPE-ID-WELCOME      (v2/message-id :WELCOME))
 (def ^:const TYPE-ID-PREFIX       (v2/message-id :PREFIX))
 (def ^:const TYPE-ID-CALL         (v2/message-id :CALL))
@@ -151,11 +153,9 @@
   [sess-id topic]
   (reset! sub {:sess-id sess-id
                :topic   topic})
-  (println "on-sub?" sess-id topic @sub)
   true)
 
 (defn subscribed? [sess-id topic]
-  (println "subscribed?" sess-id topic @sub)
 
   (let [sub-msg @sub]
     (reset! sub nil)
@@ -168,6 +168,7 @@
 
 (defn on-after-sub
   [sess-id topic]
+  (println "#####on-after-sub" topic)
   (reset! sub-after {:sess-id sess-id
                      :topic   topic}))
 
@@ -234,7 +235,6 @@
   [sess-id topic]
   (reset! unsub {:sess-id sess-id
                  :topic   topic})
-  (println "on-onsub" @unsub)
   @unsub)
 
 (defn unsubscribed? [sess-id topic]
@@ -296,7 +296,7 @@
    :on-unsubscribe on-unsub})
 
 
-(deftest http-kit-handler-test
+#_(deftest http-kit-handler-test
   (let [close (atom nil)
         send  (atom nil)]
     (with-redefs-fn
@@ -308,11 +308,9 @@
          ; Test init
          (is (ws-opened? sess-id))
 
-         (@send (json/encode [TYPE-ID-HELLO,
-                                "request-id",
-                                {}]))
-
-         (msg-received? [TYPE-ID-WELCOME, sess-id, {:version core/project-version, :roles {:dealer {}}}])
+         (@send (json/encode [TYPE-ID-HELLO, "request-id", {}]))
+         (msg-received? [TYPE-ID-WELCOME, sess-id, {:version core/project-version,
+            :roles {:dealer {}, :broker {}}}])
 
          ; Pub/Sub Events
          (@send (json/encode [TYPE-ID-SUBSCRIBE, "request-id", {}, (evt-url "chat")]))
@@ -421,18 +419,18 @@
                            :message "No such procedure: 'http://example.com/api#not-found'"
                           }, "wamp.error.no_such_procedure"])
 
-         ; ; Test invalid data
-         ; (@send "{asdadas}}asadasdasda{{{aasdas")
-         ; (msg-received? nil)
-         ; (@send (json/encode [-1, {}, "invalid type"]))
-         ; (msg-received? nil)
+         ; Test invalid data
+         (@send "{asdadas}}asadasdasda{{{aasdas")
+         (msg-received? [8 0 {:message "Invalid message type"} "wamp.error.bad-request"])
+         (@send (json/encode [-1, {}, "invalid type"]))
+         (msg-received? [8 0 {:message "Invalid message type"} "wamp.error.bad-request"])
 
-         ; ; Test close
-         ; (dosync (is (not (nil? (get @core/client-channels sess-id)))))
-         ; (@close "close-status")
-         ; (is (ws-closed? sess-id "close-status"))
-         ; (dosync (is (nil? (get @core/client-channels sess-id))))
-         ; (dosync (is (= {} @topic-clients)))
+         ; Test close
+         (dosync (is (not (nil? (get @core/client-channels sess-id)))))
+         (@close "close-status")
+         (is (ws-closed? sess-id "close-status"))
+         (dosync (is (nil? (get @core/client-channels sess-id))))
+         (dosync (is (= {} @topic-clients)))
         )
       )
     ))
@@ -456,12 +454,13 @@
                   (rpc-url "sub")   -}
    :on-subscribe {(evt-url "allow-sub") on-sub?
                   (evt-url "deny-sub")  on-sub?
-                  (evt-url "deny-pub")  on-sub?}
+                  (evt-url "deny-pub")  on-sub?
+                  :on-after             on-after-sub}
    :on-publish   {(evt-url "allow-sub") on-pub
                   (evt-url "deny-sub")  on-pub
                   (evt-url "deny-pub")  on-pub}})
 
-#_(deftest http-kit-handler-auth-test
+(deftest http-kit-handler-auth-test
   (let [close (atom nil)
         send  (atom nil)]
     (with-redefs-fn
@@ -469,13 +468,76 @@
        #'httpkit/on-receive (fn [ch cb] (reset! send cb))
        #'httpkit/close      (fn [ch]    (@close "forced"))}
       #(let [sess-id (http-kit-handler client-receive auth-handler-callbacks)]
-         (msg-received? [TYPE-ID-WELCOME, sess-id, 1, core/project-version])
 
-         ; send auth before auth request, expect error
-         (@send (json/encode [TYPE-ID-CALL, "auth-rpc1", URI-WAMP-CALL-AUTH, "foo"]))
-         (msg-received? [TYPE-ID-CALLRESULT, "auth-rpc1",
-                         "http://api.wamp.ws/error#no-authentication-requested",
-                         "no authentication previously requested"])
+        (@send (json/encode [TYPE-ID-HELLO, "request-id",
+            {
+             :authmethods ["wampcra"],
+             :authid "validuser"
+            }
+          ]))
+
+        (let [challenge-msg  (last-client-msg)
+              challenge-json (:challenge (last challenge-msg))
+              challenge      (json/decode challenge-json)
+              secret         (auth-secret nil nil nil)
+              auth-msg       (hmac-sha-256 secret challenge-json)]
+          (println "Received CHALLENGE" challenge)
+          (println "Received CHALLENGE secret" secret)
+          (println "Received CHALLENGE auth-msg" auth-msg)
+
+
+
+          ; send auth rpc before authenticated, expect error
+          (@send (json/encode [TYPE-ID-CALL, "auth-rpc1", {}, (rpc-url "auth-req"), "foo"]))
+          (msg-received? [TYPE-ID-CALLERROR, "auth-rpc1",
+                         {:message "wamp.error.not_authorized", :description nil}
+                         "wamp.error.not_authorized"])
+
+          (@send (json/encode [TYPE-ID-AUTHENTICATE, auth-msg, {}]))
+
+          (msg-received? [TYPE-ID-WELCOME, sess-id, {:version core/project-version,
+              :roles {:dealer {}, :broker {}}}])
+        )
+
+        ; Test RPC/PubSub Authorization
+        ; permission allowed for add
+        (@send (json/encode [TYPE-ID-CALL, "add-rpc", {}, (rpc-url "add"), 23, 99]))
+        (msg-received? [TYPE-ID-CALLRESULT, "add-rpc", {}, [], 122])
+
+        ; permission denied for sub
+        (@send (json/encode [TYPE-ID-CALL, "sub-rpc", {}, (rpc-url "sub"), 122, 99]))
+        (msg-received? [TYPE-ID-CALLERROR, "sub-rpc",
+                         {:message "wamp.error.not_authorized",
+                          :description nil
+                         }, "wamp.error.not_authorized"])
+        ; permission allowed for subscribe
+        (@send (json/encode [TYPE-ID-SUBSCRIBE, "add-rpc", {}, (evt-url "allow-sub")]))
+        (is (subscribed? sess-id (evt-url "allow-sub")))
+        (is (after-sub?  sess-id (evt-url "allow-sub")))
+
+
+        ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "event:allow-sub"]))
+        ; (is (subscribed? sess-id (evt-url "allow-sub")))
+        ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "event:deny-pub"]))
+        ; (is (subscribed? sess-id (evt-url "deny-pub")))
+        ; ; permission denied for subscribe
+        ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "event:deny-sub"]))
+        ; (is (not (subscribed? sess-id (evt-url "deny-sub"))))
+
+        ; ; permission allowed for publish
+        ; (@send (json/encode [TYPE-ID-PUBLISH, "event:allow-sub", "allowed"]))
+        ; (is (published? sess-id (evt-url "allow-sub") "allowed"))
+        ; (msg-received? [TYPE-ID-EVENT, (str evt-base-url "allow-sub"), "allowed"])
+        ; ; permission denied for publish
+        ; (@send (json/encode [TYPE-ID-PUBLISH, "event:deny-pub", "denied"]))
+        ; (is (not (published? sess-id (evt-url "deny-sub") "denied")))
+        ; (msg-received? nil)
+
+
+
+
+         (comment
+
 
          ; send auth request
          (@send (json/encode [TYPE-ID-CALL, "auth-req-rpc1",
@@ -541,6 +603,9 @@
 
          (@close "close-status")
          (dosync (is (= {} @core/client-auth)))
+
+         )
+
          ))))
 
 #_(deftest http-kit-handler-anon-auth-test
