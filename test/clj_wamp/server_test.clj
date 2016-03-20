@@ -168,7 +168,6 @@
 
 (defn on-after-sub
   [sess-id topic]
-  (println "#####on-after-sub" topic)
   (reset! sub-after {:sess-id sess-id
                      :topic   topic}))
 
@@ -481,11 +480,9 @@
               challenge      (json/decode challenge-json)
               secret         (auth-secret nil nil nil)
               auth-msg       (hmac-sha-256 secret challenge-json)]
-          (println "Received CHALLENGE" challenge)
-          (println "Received CHALLENGE secret" secret)
-          (println "Received CHALLENGE auth-msg" auth-msg)
-
-
+          ; (println "Received CHALLENGE" challenge)
+          ; (println "Received CHALLENGE secret" secret)
+          ; (println "Received CHALLENGE auth-msg" auth-msg)
 
           ; send auth rpc before authenticated, expect error
           (@send (json/encode [TYPE-ID-CALL, "auth-rpc1", {}, (rpc-url "auth-req"), "foo"]))
@@ -516,28 +513,26 @@
         (is (after-sub?  sess-id (evt-url "allow-sub")))
 
 
-        ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "event:allow-sub"]))
-        ; (is (subscribed? sess-id (evt-url "allow-sub")))
-        ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "event:deny-pub"]))
-        ; (is (subscribed? sess-id (evt-url "deny-pub")))
-        ; ; permission denied for subscribe
-        ; (@send (json/encode [TYPE-ID-SUBSCRIBE, "event:deny-sub"]))
-        ; (is (not (subscribed? sess-id (evt-url "deny-sub"))))
+        (@send (json/encode [TYPE-ID-SUBSCRIBE, "deny-pub-request", {}, (evt-url "deny-pub")]))
+        (is (subscribed? sess-id (evt-url "deny-pub")))
+        (is (after-sub?  sess-id (evt-url "deny-pub")))
 
-        ; ; permission allowed for publish
-        ; (@send (json/encode [TYPE-ID-PUBLISH, "event:allow-sub", "allowed"]))
-        ; (is (published? sess-id (evt-url "allow-sub") "allowed"))
-        ; (msg-received? [TYPE-ID-EVENT, (str evt-base-url "allow-sub"), "allowed"])
+        ; permission denied for subscribe
+        (@send (json/encode [TYPE-ID-SUBSCRIBE, "deny-sub-request", {}, (evt-url "deny-sub")]))
+        (is (not (subscribed? sess-id (evt-url "deny-sub"))))
+
+        ; permission allowed for publish
+        (@send (json/encode [TYPE-ID-PUBLISH, "allow-sub-request", {}, (evt-url "allow-sub"), "allowed"]))
+        (is (published? sess-id (evt-url "allow-sub") "allowed"))
+        (msg-received? [TYPE-ID-EVENT, (evt-url "allow-sub"), {}, [], "allowed"])
+
         ; ; permission denied for publish
-        ; (@send (json/encode [TYPE-ID-PUBLISH, "event:deny-pub", "denied"]))
-        ; (is (not (published? sess-id (evt-url "deny-sub") "denied")))
-        ; (msg-received? nil)
+        (@send (json/encode [TYPE-ID-PUBLISH, "deny-pub-request", {}, (evt-url "deny-pub"), "denied"]))
+        (is (not (published? sess-id (evt-url "deny-pub") "denied")))
+        (msg-received? nil)
 
 
-
-
-         (comment
-
+        (comment
 
          ; send auth request
          (@send (json/encode [TYPE-ID-CALL, "auth-req-rpc1",
@@ -581,7 +576,7 @@
            ; permission allowed for publish
            (@send (json/encode [TYPE-ID-PUBLISH, "event:allow-sub", "allowed"]))
            (is (published? sess-id (evt-url "allow-sub") "allowed"))
-           (msg-received? [TYPE-ID-EVENT, (str evt-base-url "allow-sub"), "allowed"])
+           (msg-received? [TYPE-ID-EVENT, (evt-url "allow-sub"), "allowed"])
            ; permission denied for publish
            (@send (json/encode [TYPE-ID-PUBLISH, "event:deny-pub", "denied"]))
            (is (not (published? sess-id (evt-url "deny-sub") "denied")))
@@ -708,10 +703,10 @@
          ; permission allowed for publish
          (@send (json/encode [TYPE-ID-PUBLISH, "event:pubsub1", "allowed"]))
          (is (published? sess-id (evt-url "pubsub1") "allowed"))
-         (msg-received? [TYPE-ID-EVENT, (str evt-base-url "pubsub1"), "allowed"])
+         (msg-received? [TYPE-ID-EVENT, (evt-url "pubsub1"), "allowed"])
          (@send (json/encode [TYPE-ID-PUBLISH, "event:pubsub2", "allowed"]))
          (is (published? sess-id (evt-url "pubsub2") "allowed"))
-         (msg-received? [TYPE-ID-EVENT, (str evt-base-url "pubsub2"), "allowed"])
+         (msg-received? [TYPE-ID-EVENT, (evt-url "pubsub2"), "allowed"])
 
          (@close "close-status")
          (dosync (is (= {} @core/client-auth)))

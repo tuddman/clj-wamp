@@ -177,7 +177,6 @@
         err-uri (if (nil? err-uri) (wamp2/error-uri :application-error) err-uri)
         err-msg (if (nil? err-msg) "Application error" err-msg)]
 
-    (println "call-error" topic call-id error)
     (send-error! sess-id call-id {:message err-msg
                                   :description err-desc} err-uri)
     (when kill (core/close-channel sess-id))))
@@ -201,15 +200,12 @@
   "Generates a challenge hash used by the client to sign the secret."
   [sess-id auth-key auth-secret]
   ; (throw (Exception. "Fix hazard here"))
-  (println "auth-challenge auth-key" auth-key (count auth-key))
   (let [hmac-key (str auth-secret "-" (System/currentTimeMillis) "-" sess-id)]
     (hmac-sha-256 hmac-key auth-key)))
 
 (defn- auth-sig-match?
   "Check whether the client signature matches the server's signature."
   [sess-id signature]
-  (println "auth-sig-match?" signature)
-  (println "auth-sig" (get-in @core/client-auth [sess-id :sig]))
   (if-let [auth-sig (get-in @core/client-auth [sess-id :sig])]
     (= signature auth-sig)))
 
@@ -222,13 +218,11 @@
       (alter core/client-auth assoc sess-id {:sig   sig
                                         :key   auth-key
                                         :auth? false}))
-    (println "add-client-auth-sig" auth-key auth-secret challenge (count challenge) sig)
     sig))
 
 (defn- add-client-auth-anon
   "Stores anonymous client metadata with the session."
   [sess-id]
-  (println "add-client-auth-anon" sess-id)
   (dosync (alter core/client-auth assoc sess-id {:key :anon :auth? false})))
 
 (defn client-auth-requested?
@@ -239,7 +233,6 @@
 (defn client-authenticated?
   "Checks if authentication has occurred."
   [sess-id]
-  (println "client-authenticated?" @core/client-auth)
   (get-in @core/client-auth [sess-id :auth?]))
 
 (defn- permission?
@@ -255,12 +248,9 @@
 (defn authorized?
   "Checks if the session is authorized for a message category and topic."
   [sess-id category topic perm-cb]
-  (println "authorized?" category topic perm-cb @core/client-auth)
   (if-let [auth-key (get-in @core/client-auth [sess-id :key])]
     (do
-      (println "authorized? auth-key" auth-key)
       (let [perms (perm-cb sess-id auth-key)]
-        (println "authorized? perms" perms)
         (permission? perms category topic)))))
 
 ; (defn- create-call-authreq
@@ -347,7 +337,7 @@
   [sess-id]
   (when-not (client-authenticated? sess-id)
     (do
-      (println "\nLLLOOOGGG" "auth-timeout")
+      (println "auth-timeout")
       (core/close-channel sess-id))))
 
 (defn- init-auth-timer
@@ -365,21 +355,16 @@
 (defn- on-call
   "Handle WAMP call (RPC) messages"
   [callbacks sess-id topic call-id call-opts call-params] ; call-kw-params]
-  ; (println "on-call:" callbacks sess-id topic call-id call-opts call-params)
   (if-let [rpc-cb (callbacks topic)]
     (try
       (let [call-params-list  call-params
             cb-params         [sess-id topic call-id call-params-list]
             cb-params         (apply callback-rewrite (callbacks :on-before) cb-params)
-            ; _ (println "on-call cb-params2" cb-params)
             [sess-id topic call-id call-params-list]  cb-params
             rpc-result  (binding [*call-sess-id* sess-id]  ; bind optional sess-id
                           (apply rpc-cb call-params-list))      ; use fn's own arg signature
             error      (:error  rpc-result)
             result     (:result rpc-result)]
-        (println "on-call" topic call-id call-opts call-params)
-        (println "on-call error" error)
-        (println "on-call result" result)
         (if (and (nil? error) (nil? result))
           ; No map with result or error? Assume successful rpc-result as-is
           (call-success sess-id topic call-id rpc-result (callbacks :on-after-success))
@@ -412,15 +397,11 @@
 (defn- on-subscribe
   [callbacks sess-id topic request-id]
   (dosync
-    (println "on-subscribe callbacks" callbacks)
     (when (nil? (get-in @topic-clients [topic sess-id]))
       (when-let [topic-cb (map-key-or-prefix callbacks topic)]
-        (println "on-subscribe topic-cb" topic-cb)
-
         (when (or (true? topic-cb) (topic-cb sess-id topic))
           (let [on-after-cb (callbacks :on-after)]
             (topic-subscribe topic sess-id request-id)
-            (println "on-subscribe on-after-cb" on-after-cb)
             (when (fn? on-after-cb)
               (do
                 (on-after-cb sess-id topic)))))))))
@@ -465,18 +446,13 @@
 
 (defmethod handle-message :HELLO
   [instance msg-type msg-params]
-  (println ":HELLO" msg-params)
   (let [callbacks       (:callbacks-map instance)
         sess-id         (:sess-id instance)
         details         (keywordize-keys (second msg-params))
         authmethods     (:authmethods details)
         authid          (:authid details)]
-    (println ":HELLO details" details)
-    (println ":HELLO authmethods" authmethods)
-    (println ":HELLO authid" authid)
     (if authmethods
       (let [method1 (first authmethods)]
-        (println ":HELLO method1" method1)
         (if (= method1 "wampcra")
           (do
             (if (or (= authid "validuser") true)
@@ -530,13 +506,8 @@
         callbacks     (:callbacks-map instance)
         perm-cb       (get-in callbacks [:on-auth :permissions])
         signature (first msg-params)]
-    (println "handle-message :AUTHENTICATE" signature)
 
     (let [auth-key (get-in @core/client-auth [sess-id :key])]
-      (println "sess-id" sess-id)
-      (println "auth-key" auth-key)
-      (println "(auth-sig-match? sess-id signature)" (auth-sig-match? sess-id signature))
-      (println "core/client-auth" @core/client-auth)
       (if (or (= :anon auth-key) (auth-sig-match? sess-id signature))
         (dosync
           (alter core/client-auth assoc-in [sess-id :auth?] true)
@@ -554,7 +525,6 @@
   [instance msg-type msg-params]
        ; [GOODBYE, Details|dict, Reason|uri]
   (do
-    ; (println "handle-message :GOODBYE" msg-params)
     (core/close-channel (:sess-id instance))
   ))
 
@@ -574,9 +544,6 @@
       (let [[call-id call-opts topic-uri & call-params] msg-params
             call-kw-params    {}
             topic (core/get-topic sess-id topic-uri)]
-        (println "handle-message :CALL topic-uri" topic-uri)
-        (println "handle-message :CALL call-params" call-params)
-        (println "handle-message :CALL perm-cb" perm-cb)
         (if (or (nil? perm-cb)
                 ; (= URI-WAMP-CALL-AUTHREQ topic)
                 ; (= URI-WAMP-CALL-AUTH topic)
