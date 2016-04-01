@@ -126,8 +126,8 @@
   (when debug?
     (log/debug "Disconnected from WAMP router:" code reason))
 	(try
-		(unregister-all! instance)
-		(unsubscribe-all! instance)
+		;(unregister-all! instance)
+		;(unsubscribe-all! instance)
 		(catch Exception e
 			(log/error "Unable to unregister/unsubscribe on close " e)))
 

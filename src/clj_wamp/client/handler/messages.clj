@@ -73,7 +73,7 @@
     (let [[_ registered pending] @(:registrations instance)]
       (log/debug "registered procedures " registered)
       ))
-  ;(register-next! instance)
+  (register-next! instance)
   nil
   )
 
