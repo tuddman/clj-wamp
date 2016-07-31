@@ -1,17 +1,18 @@
-(ns clj-wamp.server-v2
+(ns clj-wamp.server.server
   ^{:author "Christopher Martin, Ryan Sundberg"
     :doc "Clojure implementation of the WebSocket Application Messaging Protocol, version 2"}
   (:use [clojure.core.incubator :only [dissoc-in]]
         [clojure.string :only [split trim lower-case]])
   (:require [clojure.java.io :as io]
-            [org.httpkit.server :as httpkit]
-            [org.httpkit.timer :as timer]
-            [cheshire.core :as json]
             [clojure.tools.logging :as log]
             [clojure.data.codec.base64 :as base64]
-            [clj-wamp.core :as core]
             [clojure.walk :refer [keywordize-keys]]
-            [clj-wamp.v2 :as wamp2])
+            [clj-wamp.server.core :as core]
+            [clj-wamp.server.v2 :as wamp2] 
+            [cheshire.core :as json]
+            [org.httpkit.server :as httpkit]
+            [org.httpkit.timer :as timer]
+            )
   (:import [org.httpkit.server AsyncChannel]
            [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec]))

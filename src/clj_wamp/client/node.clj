@@ -1,11 +1,10 @@
 (ns ^{:author "Ryan Sundberg"
       :doc "WAMP V2 application node"}
-  clj-wamp.node
+  clj-wamp.client.node
   (:require
     [taoensso.timbre :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
-    [clj-wamp.core :as core]
     [clj-wamp.client.v2 :as wamp]
     [clj-wamp.client.handler.messages :as hm]
     [clj-wamp.client.publisher :refer [publish]]
@@ -22,6 +21,8 @@
     (java.net URI)))
 
 
+(defn new-rand-id []
+  (mod (.nextLong rand-gen) sess-id-max))
 
 (defn publish!
   "Publish an event"
@@ -30,12 +31,12 @@
   ([instance event-uri seq-args]
    (publish! instance event-uri seq-args nil))
   ([instance event-uri seq-args kw-args]
-   (publish instance (core/new-rand-id) {} event-uri seq-args kw-args)))
+   (publish instance (new-rand-id) {} event-uri seq-args kw-args)))
 
 (defn publish-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
-  (publish instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+  (publish instance (new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
 
 (defn call!
   "Call a procedure"
@@ -44,12 +45,12 @@
   ([instance event-uri seq-args]
    (call! instance event-uri seq-args nil))
   ([instance event-uri seq-args kw-args]
-   (caller/call instance (core/new-rand-id) {} event-uri seq-args kw-args)))
+   (caller/call instance (new-rand-id) {} event-uri seq-args kw-args)))
 
 (defn call-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
-  (caller/call instance (core/new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+  (caller/call instance (new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
 
 (defn register!
   "Register an procedure"
@@ -105,7 +106,7 @@
 
   (dotimes [n (count sub-on-call)]
     (let [[reg-uri event-chan] (nth sub-on-call n)
-          req-id (core/new-rand-id)]
+          req-id (new-rand-id)]
       (put! (:unregistered @subscriptions) [req-id reg-uri event-chan])))
 
   )

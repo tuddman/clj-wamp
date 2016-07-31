@@ -1,19 +1,17 @@
-(ns clj-wamp.v2
+(ns clj-wamp.server.v2
   (:require
     [clojure.core.async :as async]
     [clojure.tools.logging :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
-    [clj-wamp.core :as core]))
+    [clj-wamp.server.core :as core]))
+
 
 (def subprotocol-id "wamp.2.json")
 
-(comment
-  https://tools.ietf.org/html/draft-oberstet-hybi-tavendo-wamp-02
+;; WAMP v2 SPEC
+(comment https://tools.ietf.org/html/draft-oberstet-hybi-tavendo-wamp-02)
 
-
-
-  )
 
 (def ^:const message-id-table
   {:HELLO 1

@@ -1,4 +1,4 @@
-(ns clj-wamp.core
+(ns clj-wamp.server.core
   (:require 
     [clojure.string :refer [split]]
     [clojure.tools.logging :as log]
