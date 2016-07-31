@@ -11,6 +11,7 @@
     [clj-wamp.client.subscriber :as subscriber]
     [clj-wamp.client.callee :as callee]
     [clj-wamp.client.caller :as caller]
+    [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.libs.channels :refer [incoming-messages]]
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
@@ -21,8 +22,89 @@
     (java.net URI)))
 
 
+
+(def subprotocol-id "wamp.2.json")
+
+
 (defn new-rand-id []
   (mod (.nextLong rand-gen) sess-id-max))
+
+
+(defn new-request
+  []
+  (new-rand-id))
+
+
+
+(defn hello
+  "[HELLO, Realm|uri, Details|dict]"
+  [{:keys [debug? authenticate?] :as instance}]
+  (send! instance
+         [(message-id :HELLO)
+          (:realm instance)
+          (merge {:roles
+                  {:callee     {:features
+                                {
+                                 :caller_identification      true
+                                 :pattern_based_registration true
+                                 :progressive_call_results   true
+                                 :registration_revocation    true
+                                 :shared_registration        true
+                                 }
+                                }
+                   :caller     {:features
+                                {
+                                 :caller_identification    true
+                                 :progressive_call_results true
+                                 }
+                                }
+                   :subscriber {:features
+                                {
+                                 :caller_identification    true
+                                 :progressive_call_results true
+                                 }
+                                }
+                   :publisher
+                               {:features
+                                {
+                                 :subscriber_blackwhite_listing true
+                                 :publisher_exclusion           true
+                                 :publisher_identification      true
+                                 }
+                                }}}
+                 (if authenticate?
+                   (apply dissoc (:auth-details instance) [:secret])))]))
+
+(defn abort
+  "[ABORT, Details|dict, Reason|uri]"
+  [instance details uri]
+  (send! instance [(message-id :ABORT) details uri]))
+
+(defn goodbye
+  "[GOODBYE, Details|dict, Reason|uri]"
+  [instance details uri]
+  (send! instance [(message-id :GOODBYE) details uri]))
+
+(defn error
+ "[ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri]
+  [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list]
+  [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]" 
+  [instance data]
+  (let [[request-type request-id details uri arguments arguments-kw] data]
+  (send! instance
+         [(message-id :ERROR) request-type request-id details uri arguments arguments-kw])))
+
+(defn exception-message
+  [{:keys [debug?] :as _} ex]
+  (if debug?
+    (.getMessage ex)
+    "Application error"))
+
+(defn exception-stacktrace
+  [{:keys [debug?] :as _} ex]
+  (if debug?
+    {:stacktrace (map str (.getStackTrace ex))}))
+ 
 
 (defn publish!
   "Publish an event"
@@ -33,10 +115,22 @@
   ([instance event-uri seq-args kw-args]
    (publish instance (new-rand-id) {} event-uri seq-args kw-args)))
 
+
 (defn publish-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
   (publish instance (new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+
+
+(defn send!
+  [{:keys [debug?] :as instance} msg-data]
+  (let [json-str (json/encode (remove nil? msg-data))]
+    ;(when debug?
+      (log/debug "Sending WAMP message" json-str)
+    ;)
+    (when-let [socket @(:socket instance)]
+      (ws/send-msg socket json-str))))
+ 
 
 (defn call!
   "Call a procedure"
@@ -47,10 +141,12 @@
   ([instance event-uri seq-args kw-args]
    (caller/call instance (new-rand-id) {} event-uri seq-args kw-args)))
 
+
 (defn call-to!
   "Publish an event to specific session ids"
   [instance session-ids event-uri seq-args kw-args]
   (caller/call instance (new-rand-id) {:eligible session-ids} event-uri seq-args kw-args))
+
 
 (defn register!
   "Register an procedure"
@@ -65,6 +161,7 @@
   [instance event-uri]
   (callee/unregister! instance event-uri))
 
+
 (defn unregister-all!
   [instance]
   (let [[_ registered _] @(:registrations instance)]
@@ -74,15 +171,18 @@
       (unregister! instance reg-uri)
       )))
 
+
 (defn subscribe!
   "Subscribe to an Event"
   [instance event-uri event-chan]
   (subscriber/subscribe-new! instance event-uri event-chan))
 
+
 (defn unsubscribe!
   "Unsubscribe of an Event"
   [instance event-uri]
   (subscriber/unsubscribe! instance event-uri))
+
 
 (defn unsubscribe-all!
 	[instance]
@@ -92,6 +192,7 @@
 								reg-uri (first (get @registered reg-id))]]
 			(unsubscribe! instance reg-uri)
 			)))
+
 
 (defn- handle-connect
   [{:keys [debug? registrations subscriptions reg-on-call sub-on-call] :as instance} session]
@@ -111,6 +212,7 @@
 
   )
 
+
 (defn- handle-message
   [{:keys [debug?] :as instance} msg-str]
   (let [msg-data (try (json/decode msg-str)
@@ -120,7 +222,9 @@
       (log/debug "WAMP message received:" msg-str))
     (hm/handle-message instance msg-data)))
 
+
 (declare connect!)
+
 
 (defn- handle-close
   [{:keys [debug?] :as instance} code reason]
@@ -136,9 +240,11 @@
   (when @(:reconnect-state instance)
     (connect! instance)))
 
+
 (defn- handle-error
   [_ ex]
   (log/error ex "WAMP socket error"))
+
 
 (defn- try-connect [{:keys [debug? router-uri] :as instance}]
   (try
@@ -163,6 +269,7 @@
       (log/error e "Failed to connect to WAMP router")
       false)))
 
+
 (defn connect! [{:keys [reconnect-state reconnect? reconnect-wait-ms] :as instance}]
   (reset! reconnect-state reconnect?)
   (let [connected? (try-connect instance)]
@@ -173,6 +280,7 @@
           (Thread/sleep reconnect-wait-ms)
           (recur instance))
         instance))))
+
 
 (defn disconnect! [{:keys [debug?] :as instance}]
   (reset! (:reconnect-state instance) false)
@@ -189,6 +297,7 @@
              (ws/close socket)
              nil))))
 
+
 (defn create [{:keys [router-uri realm _] :as conf}]
   {:pre [(string? router-uri)
          (string? realm)]}
@@ -204,7 +313,7 @@
        :socket (atom nil)
        :reconnect-state (atom false)
        :registrations (atom nil)
-			 :subscriptions (atom {:unregistered (chan)
-														 :pending      (chan)
-														 :registered   (atom nil)
-														 })})))
+       :subscriptions (atom {:unregistered (chan)
+							 :pending      (chan)
+							 :registered   (atom nil)}) } )))
+
