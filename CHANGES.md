@@ -1,3 +1,11 @@
+## 2.1.0 (subject to review)
+ * v2 client
+ * further support for supporting v2 of WAMP.  contribution by @Ninerian
+
+## 2.0.0-SNAPSHOT (subject to review)
+ * update (WIP) to support v2 of WAMP. contribution by @DoctorBud
+
+
 ## 1.0.2 (2014/4/12)
  * Fix: Support catch-all ("*") in subscribe and publish maps
 

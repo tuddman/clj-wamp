@@ -545,7 +545,7 @@
             (apply on-publish on-pub-cbs sess-id topic event pub-args)))
 
         ; default: Unknown message type
-        (log/warn "Unknown message type" data)))))
+        (log/warn "xnknown message type" data)))))
 
 
 (defn http-kit-handler
@@ -701,15 +701,16 @@
        (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
          (if (origin-match? ~origin-re ~request)
            (if (subprotocol? "wamp" ~request)
-             (do
-               (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
-                 {"Upgrade"                "websocket"
-                  "Connection"             "Upgrade"
-                  "Sec-WebSocket-Accept"   (httpkit/accept key#)
-                  "Sec-WebSocket-Protocol" "wamp"})
-               ~@body
-               {:body ~ch-name})
+             (do (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
+                   {"Upgrade"                "websocket"
+                    "Connection"             "Upgrade"
+                    "Sec-WebSocket-Accept"   (httpkit/accept key#)
+                    "Sec-WebSocket-Protocol" "wamp"})
+                 ~@body
+                {:body ~ch-name})
              {:status 400 :body "missing or bad WebSocket-Protocol"})
            {:status 400 :body "missing or bad WebSocket-Origin"})
          {:status 400 :body "missing or bad WebSocket-Key"})
        {:status 400 :body "not websocket protocol"})))
+
+

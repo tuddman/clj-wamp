@@ -1,9 +1,10 @@
 (ns clj-wamp.core
   (:require 
-    [taoensso.timbre :as log]
     [clojure.string :refer [split]]
+    [clojure.tools.logging :as log]
+    [cheshire.core :as json] 
     [org.httpkit.server :as httpkit]
-    [cheshire.core :as json])
+    [taoensso.timbre :as log])
   (:import
     [java.util Random]))
 
@@ -46,7 +47,6 @@
 (defn add-topic-prefix
   "Adds a new CURI topic prefix for a websocket client."
   [sess-id prefix uri]
-  (log/trace "New CURI Prefix [" sess-id "]" prefix uri)
   (dosync
     (alter client-prefixes assoc-in [sess-id prefix] uri)))
 
@@ -69,7 +69,7 @@
       (if (fn? channel)
         (httpkit/close channel) ; for unit testing
         (.serverClose channel code)) ; TODO thread-safe? (locking AsyncChannel ...) ?
-      (log/trace "Channel closed" code))))
+      )))
 
 (defn send!
   "Sends data to a websocket client."
@@ -77,7 +77,6 @@
   (dosync
     (let [channel-or-fn (get-client-channel sess-id)
           json-data     (json/encode data {:escape-non-ascii true})]
-      (log/trace "Sending data:" data)
       (if (fn? channel-or-fn) ; application callback?
         (channel-or-fn data)
         (when channel-or-fn

@@ -1,29 +1,19 @@
 # clj-wamp
 
-A Clojure implementation of the WebSocket Application Messaging Protocol (v1),
+A Clojure implementation of the WebSocket Application Messaging Protocol (v2),
 for HTTP Kit servers.
 
 Provides hooks for common WebSocket messaging patterns and error handling (RPC, PubSub, and Authentication).
 
-[![Build Status](https://travis-ci.org/cgmartin/clj-wamp.png?branch=master)](https://travis-ci.org/cgmartin/clj-wamp)
-
-Visit [cljwamp.us](http://cljwamp.us) for live demos and additional information.
-See [clj-wamp-example](https://github.com/cgmartin/clj-wamp-example) for an example project and source code.
-
 For information on **HTTP Kit**, a Ring-compatible HTTP server for Clojure, visit [http-kit.org](http://http-kit.org/).
 
-For information on the **WAMP v1 specification**, visit [wamp.ws](http://wamp.ws).
+For information on the **WAMP v2 specification**, visit [wamp.ws](http://wamp.ws).
 
 ## Usage
 
-Create a new starter project with clj-wamp and HTTP Kit:
-```bash
-lein new clj-wamp my-project
-```
-
-...or add the following dependency to your existing `project.clj` file:
+Add the following dependency to your existing `project.clj` file:
 ```clojure
-[clj-wamp "1.0.2"]
+[tuddman/clj-wamp "2.1.0"]
 ```
 
 Run clj-wamp's http-kit-handler within http-kit's with-channel context:
@@ -77,13 +67,30 @@ Run clj-wamp's http-kit-handler within http-kit's with-channel context:
 (http-kit/run-server my-wamp-handler {:port 8080})
 ```
 
-See [the docs](http://cljwamp.us/doc/index.html) for more information on the API and callback signatures.
+## Documentation
+
+To see codox generated docs for more information on the API and callback signatures.
+
+Assuming you have `codox` installed as a plugin in your `~/.lein/profiles.clj` :
+
+```
+lein codox
+cd target/docs
+```
+
+...then browse to index.html in the `target/docs` directory
+
 
 ## Change Log
 
 [CHANGES.md](https://github.com/cgmartin/clj-wamp/blob/master/CHANGES.md)
 
-## Contributions
+## Contributors
+
+* [Ninerian](https://github.com/Ninerian/clj-wamp/) - version-2
+* [DoctorBud](https://github.com/DoctorBud/clj-wamp) - version-2-server
+* [sundbry](https://github.com/sundbry/clj-wamp) - version-2
+* [cjmartin](https://github.com/cgmartin/clj-wamp)  - Original Author
 
 Pull requests are most welcome!
 
