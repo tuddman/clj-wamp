@@ -69,7 +69,7 @@ Run clj-wamp's http-kit-handler within http-kit's with-channel context:
 
 ## Documentation
 
-To see codox generated docs for more information on the API and callback signatures.
+To see [codox](https://github.com/weavejester/codox) generated docs & for more information on the API and callback signatures.
 
 Assuming you have `codox` installed as a plugin in your `~/.lein/profiles.clj` :
 
@@ -83,7 +83,7 @@ cd target/docs
 
 ## Change Log
 
-[CHANGES.md](https://github.com/cgmartin/clj-wamp/blob/master/CHANGES.md)
+[CHANGES.md](https://github.com/tuddman/clj-wamp/blob/master/CHANGES.md)
 
 ## Contributors
 
