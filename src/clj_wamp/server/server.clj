@@ -7,7 +7,8 @@
             [clojure.data.codec.base64 :as base64]
             [clojure.walk :refer [keywordize-keys]]
             [clj-wamp.server.core :as core]
-            [clj-wamp.server.v2 :as wamp2] 
+            [clj-wamp.info.ids :refer [message-id reverse-message-id]]
+            [clj-wamp.info.ids :refer [error-uri]]
             [cheshire.core :as json]
             [org.httpkit.server :as httpkit]
             [org.httpkit.timer :as timer]
@@ -21,12 +22,13 @@
 (def client-topics (ref {}))
 (def topic-clients (ref {}))
 
+(def subprotocol-id "wamp.2.json")
 
 (defn send-subscribed!
   "Sends a WAMP SUBSCRIBED message to a websocket client.
          [SUBSCRIBED, SUBSCRIBE.Request|id, Subscription|id]"
   [sess-id request-id subscription-id]
-  (core/send! sess-id (wamp2/message-id :SUBSCRIBED) request-id subscription-id))
+  (core/send! sess-id (message-id :SUBSCRIBED) request-id subscription-id))
 
 
 (defn topic-subscribe
@@ -89,7 +91,7 @@
   "Sends a WAMP welcome message to a websocket client.
   [WELCOME, Session|id, Details|dict]"
   [sess-id]
-  (core/send! sess-id (wamp2/message-id :WELCOME) sess-id
+  (core/send! sess-id (message-id :WELCOME) sess-id
               {:version core/project-version
                :roles
                {:dealer {}
@@ -100,13 +102,13 @@
 (defn send-abort!
   "Sends an ABORT message to abort opening a session."
   [sess-id details-dict reason-uri]
-  (core/send! sess-id (wamp2/message-id :ABORT) details-dict reason-uri))
+  (core/send! sess-id (message-id :ABORT) details-dict reason-uri))
 
 
 (defn send-goodbye!
   "Send a GOODBYE message"
   [sess-id details-dict reason-uri]
-  (core/send! sess-id (wamp2/message-id :GOODBYE) details-dict reason-uri))
+  (core/send! sess-id (message-id :GOODBYE) details-dict reason-uri))
 
 
 (defn send-call-result!
@@ -115,7 +117,7 @@
    [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list]
    [RESULT, CALL.Request|id, Details|dict, YIELD.Arguments|list, YIELD.ArgumentsKw|dict]"
   [sess-id call-id result]
-  (core/send! sess-id (wamp2/message-id :RESULT) call-id {} [] result))
+  (core/send! sess-id (message-id :RESULT) call-id {} [] result))
 
 
 (defn send-error!
@@ -125,7 +127,7 @@
    [ERROR, CALL, CALL.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]"
   [sess-id call-id error-info error-uri]
   ; (println "send-error!" call-id error-info error-uri)
-  (core/send! sess-id (wamp2/message-id :ERROR) call-id error-info error-uri))
+  (core/send! sess-id (message-id :ERROR) call-id error-info error-uri))
 
 
 (defn send-event!
@@ -137,19 +139,19 @@
      [EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id,
           Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]"
   [topic event]
-  (topic-send! topic (wamp2/message-id :EVENT) topic {} [] event))
+  (topic-send! topic (message-id :EVENT) topic {} [] event))
 
 
 (defn broadcast-event!
   "Sends an event message to all clients in a topic but those excluded."
   [topic event excludes]
-    (topic-broadcast! topic excludes (wamp2/message-id :EVENT) topic {} [] event))
+    (topic-broadcast! topic excludes (message-id :EVENT) topic {} [] event))
 
 
 (defn emit-event!
   "Sends an event message to specific clients in a topic"
   [topic event includes]
-    (topic-emit! topic includes (wamp2/message-id :EVENT) topic {} [] event))
+    (topic-emit! topic includes (message-id :EVENT) topic {} [] event))
 
 
 ;; WAMP callbacks
@@ -192,7 +194,7 @@
         cb-params (apply callback-rewrite on-after-cb cb-params)
         [sess-id topic call-id error] cb-params
         {err-uri :uri err-msg :message err-desc :description kill :kill} error
-        err-uri (if (nil? err-uri) (wamp2/error-uri :application-error) err-uri)
+        err-uri (if (nil? err-uri) (error-uri :application-error) err-uri)
         err-msg (if (nil? err-msg) "Application error" err-msg)]
 
     (send-error! sess-id call-id {:message err-msg
@@ -285,16 +287,16 @@
 ;   (fn [& [auth-key extra]]
 ;     (dosync
 ;       (if (client-authenticated? *call-sess-id*)
-;         {:error {:uri (wamp2/error-uri :authorization-failed)
+;         {:error {:uri (error-uri :authorization-failed)
 ;                  :message "already authenticated"}}
 ;         (if (client-auth-requested? *call-sess-id*)
-;           {:error {:uri (wamp2/error-uri :authorization-failed)
+;           {:error {:uri (error-uri :authorization-failed)
 ;                    :message "authentication request already issued - authentication pending"}}
 
 ;           (if (nil? auth-key)
 ;             ; Allow anonymous auth?
 ;             (if-not allow-anon?
-;               {:error {:uri (wamp2/error-uri :not-authorized)
+;               {:error {:uri (error-uri :not-authorized)
 ;                        :message "authentication as anonymous is forbidden"}}
 ;               (do
 ;                 (add-client-auth-anon *call-sess-id*)
@@ -304,7 +306,7 @@
 ;               (let [challenge (auth-challenge *call-sess-id* auth-key auth-secret)]
 ;                 (add-client-auth-sig *call-sess-id* auth-key auth-secret challenge)
 ;                 challenge) ; return the challenge
-;               {:error {:uri (wamp2/error-uri :authorization-failed)
+;               {:error {:uri (error-uri :authorization-failed)
 ;                        :message "authentication key does not exist"}})))))))
 
 
@@ -329,10 +331,10 @@
 ;   (fn [& [signature]]
 ;     (dosync
 ;       (if (client-authenticated? *call-sess-id*)
-;         {:error {:uri (wamp2/error-uri :authorization-failed)
+;         {:error {:uri (error-uri :authorization-failed)
 ;                  :message "already authenticated"}}
 ;         (if (not (client-auth-requested? *call-sess-id*))
-;           {:error {:uri (wamp2/error-uri :authorization-failed)
+;           {:error {:uri (error-uri :authorization-failed)
 ;                    :message "no authentication previously requested"}}
 ;           (let [auth-key (get-in @core/client-auth [*call-sess-id* :key])]
 ;             (if (or (= :anon auth-key) (auth-sig-match? *call-sess-id* signature))
@@ -342,7 +344,7 @@
 ;               (do
 ;                 ; remove previous auth data, must request and authenticate again
 ;                 (alter core/client-auth dissoc *call-sess-id*)
-;                 {:error {:uri (wamp2/error-uri :not-authorized)
+;                 {:error {:uri (error-uri :not-authorized)
 ;                          :message "signature for authentication request is invalid"}}))))))))
 
 
@@ -404,13 +406,13 @@
             (call-error   sess-id topic call-id error  (callbacks :on-after-error)))))
       (catch Exception e
         (call-error sess-id topic call-id
-          {:uri (wamp2/error-uri :internal-error)
+          {:uri (error-uri :internal-error)
            :message "Internal error"
            :description (.getMessage e)}
           (callbacks :on-after-error))
         (println "\nLLLOOOGGG" "RPC Exception:" topic call-params e)))
     (call-error sess-id topic call-id
-      {:uri (wamp2/error-uri :no-such-procedure)
+      {:uri (error-uri :no-such-procedure)
        :message (str "No such procedure: '" topic "'")}
       (callbacks :on-after-error))))
 
@@ -470,7 +472,7 @@
 
 (defmulti handle-message
   (fn [instance msg-type msg-params]
-    (let [type-code (wamp2/reverse-message-id msg-type)]
+    (let [type-code (reverse-message-id msg-type)]
       ; (println "handle-message" msg-type msg-params type-code)
       type-code)))
 
@@ -478,7 +480,7 @@
 (defmethod handle-message nil
   [instance msg-type msg-params]
   ; (println "handle-message nil" msg-type msg-params)
-  (send-error! (:sess-id instance) 0 {:message "Invalid message type"} (wamp2/error-uri :bad-request)))
+  (send-error! (:sess-id instance) 0 {:message "Invalid message type"} (error-uri :bad-request)))
 
 
 (defmethod handle-message :HELLO
@@ -516,7 +518,7 @@
 
                   (add-client-auth-sig sess-id auth-key auth-secret challenge-str )
 
-                  (core/send! sess-id (wamp2/message-id :CHALLENGE) method1
+                  (core/send! sess-id (message-id :CHALLENGE) method1
                               challenge-response)
               )
               (do
@@ -553,7 +555,7 @@
         (dosync
           ; remove previous auth data, must request and authenticate again
           (alter core/client-auth dissoc sess-id)
-          {:error {:uri (wamp2/error-uri :not-authorized)
+          {:error {:uri (error-uri :not-authorized)
                    :message "signature for authentication request is invalid"}})
     ))))
 
@@ -591,7 +593,7 @@
           )
           (call-error sess-id topic call-id
             ; {:uri URI-WAMP-ERROR-NOAUTH :message DESC-WAMP-ERROR-NOAUTH}
-            {:uri (wamp2/error-uri :not-authorized) :message (wamp2/error-uri :not-authorized)}
+            {:uri (error-uri :not-authorized) :message (error-uri :not-authorized)}
             (on-call-cbs :on-after-error)))))
 ))
 
@@ -823,13 +825,13 @@
      (if (:websocket? ~request)
        (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
          (if (origin-match? ~origin-re ~request)
-           (if (subprotocol? wamp2/subprotocol-id ~request)
+           (if (subprotocol? subprotocol-id ~request)
              (do
                (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
                  {"Upgrade"                "websocket"
                   "Connection"             "Upgrade"
                   "Sec-WebSocket-Accept"   (httpkit/accept key#)
-                  "Sec-WebSocket-Protocol" wamp2/subprotocol-id}
+                  "Sec-WebSocket-Protocol" subprotocol-id}
                   )
                ~@body
                {:body ~ch-name})
