@@ -3,11 +3,11 @@
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
-    [taoensso.timbre :as log]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.libs.channels :refer [errors]]
     [clj-wamp.libs.helpers :refer [finds-nested]]
+    [taoensso.timbre :as log]
     ))
 
 (defmulti handle-error (fn [_ data] (reverse-message-id (second data))))

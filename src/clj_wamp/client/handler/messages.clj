@@ -1,9 +1,7 @@
 (ns clj-wamp.client.handler.messages
   (:require
     [clojure.core.async :refer [go >! <! <!! go-loop chan]]
-    [taoensso.timbre :as log]
-    [gniazdo.core :as ws]
-    [clj-wamp.client.v2 :refer [error goodbye]]
+    [clj-wamp.client.node :refer [error goodbye]]
     [clj-wamp.info.ids :refer [reverse-message-id message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.libs.helpers :as lib]
@@ -12,6 +10,8 @@
     [clj-wamp.client.callee :refer [perform-invocation register-next!]]
     [clj-wamp.client.subscriber :refer [subscribe-next!]]
     [clj-wamp.client.auth :refer [handle-authenticate]]
+    [gniazdo.core :as ws]
+    [taoensso.timbre :as log]
     ))
 
 (defmulti handle-message (fn [_ data] (reverse-message-id (first data))))

@@ -5,7 +5,6 @@
     [taoensso.timbre :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
-    [clj-wamp.client.v2 :as wamp]
     [clj-wamp.client.handler.messages :as hm]
     [clj-wamp.client.publisher :refer [publish]]
     [clj-wamp.client.subscriber :as subscriber]
@@ -22,9 +21,11 @@
     (java.net URI)))
 
 
-
 (def subprotocol-id "wamp.2.json")
 
+
+(def ^:private rand-gen (Random.))
+(def ^:private sess-id-max 9007199254740992) ; 2^53 per WAMP spec
 
 (defn new-rand-id []
   (mod (.nextLong rand-gen) sess-id-max))
@@ -33,7 +34,6 @@
 (defn new-request
   []
   (new-rand-id))
-
 
 
 (defn hello
@@ -257,13 +257,13 @@
                               router-uri
                               :client (:client instance)
                               :headers {}
-                              :subprotocols [wamp/subprotocol-id]
+                              :subprotocols [subprotocol-id]
                               :on-connect (partial handle-connect instance)
                               :on-receive (partial handle-message instance)
                               :on-close (partial handle-close instance)
                               :on-error (partial handle-error instance))]
                  socket))))
-    (wamp/hello instance)
+    (hello instance)
     true
     (catch Exception e
       (log/error e "Failed to connect to WAMP router")

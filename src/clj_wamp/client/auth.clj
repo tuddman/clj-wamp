@@ -1,6 +1,6 @@
 (ns clj-wamp.client.auth
   (:require
-    [clj-wamp.client.v2 :refer [send! error exception-message]]
+    [clj-wamp.client.node :refer [send! error exception-message]]
     [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]

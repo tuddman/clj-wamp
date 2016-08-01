@@ -3,7 +3,7 @@
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
-    [clj-wamp.client.v2 :refer [send!]]
+    [clj-wamp.client.node :refer [send!]]
     [clj-wamp.info.ids :refer [message-id]]
     ))
 

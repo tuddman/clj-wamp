@@ -1,7 +1,6 @@
 (ns clj-wamp.server.core
   (:require 
     [clojure.string :refer [split]]
-    [clojure.tools.logging :as log]
     [cheshire.core :as json] 
     [org.httpkit.server :as httpkit]
     [taoensso.timbre :as log])
@@ -22,6 +21,7 @@
 (def client-prefixes (ref {}))
 (def client-auth     (ref {}))
 
+
 (defn add-client
   "Adds a websocket channel (or callback function) to a map of clients
   and returns a unique session id."
@@ -30,11 +30,13 @@
     (dosync (alter client-channels assoc sess-id channel-or-fn))
     sess-id))
 
+
 (defn get-client-channel
   "Returns the channel (or callback function) for a websocket client's
   session id."
   [sess-id]
   (get @client-channels sess-id))
+
 
 (defn del-client
   "Removes a websocket session from the map of clients."
@@ -44,11 +46,13 @@
     (alter client-prefixes dissoc sess-id)
     (alter client-auth     dissoc sess-id)))
 
+
 (defn add-topic-prefix
   "Adds a new CURI topic prefix for a websocket client."
   [sess-id prefix uri]
   (dosync
     (alter client-prefixes assoc-in [sess-id prefix] uri)))
+
 
 (defn get-topic
   "Returns the full topic URI for a prefix. If prefix does not exist,
@@ -61,6 +65,7 @@
       (str uri suffix)
       curi)))
 
+
 (defn close-channel
   ([sess-id]
     (close-channel sess-id 1002))
@@ -70,6 +75,7 @@
         (httpkit/close channel) ; for unit testing
         (.serverClose channel code)) ; TODO thread-safe? (locking AsyncChannel ...) ?
       )))
+
 
 (defn send!
   "Sends data to a websocket client."
@@ -81,3 +87,4 @@
         (channel-or-fn data)
         (when channel-or-fn
           (httpkit/send! channel-or-fn json-data))))))
+

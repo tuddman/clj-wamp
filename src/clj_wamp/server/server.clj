@@ -4,7 +4,6 @@
   (:use [clojure.core.incubator :only [dissoc-in]]
         [clojure.string :only [split trim lower-case]])
   (:require [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
             [clojure.data.codec.base64 :as base64]
             [clojure.walk :refer [keywordize-keys]]
             [clj-wamp.server.core :as core]
@@ -12,7 +11,7 @@
             [cheshire.core :as json]
             [org.httpkit.server :as httpkit]
             [org.httpkit.timer :as timer]
-            )
+            [taoensso.timbre :as log] )
   (:import [org.httpkit.server AsyncChannel]
            [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec]))
@@ -29,6 +28,7 @@
   [sess-id request-id subscription-id]
   (core/send! sess-id (wamp2/message-id :SUBSCRIBED) request-id subscription-id))
 
+
 (defn topic-subscribe
   "Subscribes a websocket session to a topic."
   [topic sess-id request-id]
@@ -37,6 +37,7 @@
     (alter client-topics assoc-in [sess-id topic] true))
   (send-subscribed! sess-id request-id topic))
 
+
 (defn topic-unsubscribe
   "Unsubscribes a websocket session from a topic."
   [topic sess-id]
@@ -44,12 +45,14 @@
     (alter topic-clients dissoc-in [topic sess-id])
     (alter client-topics dissoc-in [sess-id topic])))
 
+
 (defn- topic-send!
   "Sends an event to *all* websocket clients subscribed to a topic."
   [topic & data]
   (dosync
     (doseq [[sess-id _] (@topic-clients topic)]
       (apply core/send! sess-id data))))
+
 
 (defn- topic-broadcast!
   "Send an event to websocket clients subscribed to a topic,
@@ -60,6 +63,7 @@
       (doseq [[sess-id _] (@topic-clients topic)]
         (if (not-any? #{sess-id} excludes)
           (apply core/send! sess-id data))))))
+
 
 (defn- topic-emit!
   "Sends an event to a specific list of websocket clients subscribed
@@ -72,10 +76,12 @@
           (if (some #{sess-id} includes)
             (apply core/send! sess-id data)))))))
 
+
 (defn get-topic-clients [topic]
   "Returns all client session ids within a topic."
   (if-let [clients (@topic-clients topic)]
     (keys clients)))
+
 
 ;; WAMP websocket send! utils
 
@@ -90,15 +96,18 @@
                 :broker {}
                 }}))
 
+
 (defn send-abort!
   "Sends an ABORT message to abort opening a session."
   [sess-id details-dict reason-uri]
   (core/send! sess-id (wamp2/message-id :ABORT) details-dict reason-uri))
 
+
 (defn send-goodbye!
   "Send a GOODBYE message"
   [sess-id details-dict reason-uri]
   (core/send! sess-id (wamp2/message-id :GOODBYE) details-dict reason-uri))
+
 
 (defn send-call-result!
   "Sends a WAMP call result message to a websocket client.
@@ -108,6 +117,7 @@
   [sess-id call-id result]
   (core/send! sess-id (wamp2/message-id :RESULT) call-id {} [] result))
 
+
 (defn send-error!
   "Sends a WAMP call error message to a websocket client.
    [ERROR, CALL, CALL.Request|id, Details|dict, Error|uri]
@@ -116,6 +126,7 @@
   [sess-id call-id error-info error-uri]
   ; (println "send-error!" call-id error-info error-uri)
   (core/send! sess-id (wamp2/message-id :ERROR) call-id error-info error-uri))
+
 
 (defn send-event!
   "Sends an event message to all clients in topic.
@@ -128,15 +139,18 @@
   [topic event]
   (topic-send! topic (wamp2/message-id :EVENT) topic {} [] event))
 
+
 (defn broadcast-event!
   "Sends an event message to all clients in a topic but those excluded."
   [topic event excludes]
     (topic-broadcast! topic excludes (wamp2/message-id :EVENT) topic {} [] event))
 
+
 (defn emit-event!
   "Sends an event message to specific clients in a topic"
   [topic event includes]
     (topic-emit! topic includes (wamp2/message-id :EVENT) topic {} [] event))
+
 
 ;; WAMP callbacks
 
@@ -147,6 +161,7 @@
     (apply callback params)
     (when (or (nil? callback) (true? callback))
       params)))
+
 
 (defn- on-close
   "Clean up clients and topics upon disconnect."
@@ -162,12 +177,14 @@
       (when (fn? unsub-cb) (unsub-cb sess-id topic)))
     (core/del-client sess-id)))
 
+
 (defn- call-success
   [sess-id topic call-id result on-after-cb]
   (let [cb-params [sess-id topic call-id result]
         cb-params (apply callback-rewrite on-after-cb cb-params)
         [sess-id topic call-id result] cb-params]
     (send-call-result! sess-id call-id result)))
+
 
 (defn- call-error
   [sess-id topic call-id error on-after-cb]
@@ -197,6 +214,7 @@
         result   (.doFinal hmac (.getBytes data))]
     (String. (base64/encode result) "UTF-8")))
 
+
 (defn auth-challenge
   "Generates a challenge hash used by the client to sign the secret."
   [sess-id auth-key auth-secret]
@@ -204,11 +222,13 @@
   (let [hmac-key (str auth-secret "-" (System/currentTimeMillis) "-" sess-id)]
     (hmac-sha-256 hmac-key auth-key)))
 
+
 (defn- auth-sig-match?
   "Check whether the client signature matches the server's signature."
   [sess-id signature]
   (if-let [auth-sig (get-in @core/client-auth [sess-id :sig])]
     (= signature auth-sig)))
+
 
 (defn- add-client-auth-sig
   "Stores the authorization signature on the server-side for later
@@ -221,20 +241,24 @@
                                         :auth? false}))
     sig))
 
+
 (defn- add-client-auth-anon
   "Stores anonymous client metadata with the session."
   [sess-id]
   (dosync (alter core/client-auth assoc sess-id {:key :anon :auth? false})))
+
 
 (defn client-auth-requested?
   "Checks if the authreq call has already occurred."
   [sess-id]
   (not (nil? (get-in @core/client-auth [sess-id :key]))))
 
+
 (defn client-authenticated?
   "Checks if authentication has occurred."
   [sess-id]
   (get-in @core/client-auth [sess-id :auth?]))
+
 
 (defn- permission?
   "Checks if a topic and category has permissions in a permission map.
@@ -245,6 +269,7 @@
   (or (get perms :all)
     (true? (get perms category))
     (get-in perms [category topic])))
+
 
 (defn authorized?
   "Checks if the session is authorized for a message category and topic."
@@ -281,6 +306,7 @@
 ;                 challenge) ; return the challenge
 ;               {:error {:uri (wamp2/error-uri :authorization-failed)
 ;                        :message "authentication key does not exist"}})))))))
+
 
 (defn- expand-auth-perms
   "Expands shorthand permission maps into full topic permissions."
@@ -319,6 +345,7 @@
 ;                 {:error {:uri (wamp2/error-uri :not-authorized)
 ;                          :message "signature for authentication request is invalid"}}))))))))
 
+
 (defn- init-cr-auth
   "Initializes the authorization RPC calls (if configured)."
   [callbacks]
@@ -333,6 +360,7 @@
         {}))
     callbacks))
 
+
 (defn- auth-timeout
   "Closes the session if the client has not authenticated."
   [sess-id]
@@ -340,6 +368,7 @@
     (do
       (println "auth-timeout")
       (core/close-channel sess-id))))
+
 
 (defn- init-auth-timer
   "Ensure authentication occurs within a certain time period or else
@@ -350,6 +379,7 @@
     (let [timeout-ms (auth-cbs :timeout 20000)]
       (if (> timeout-ms 0)
         (timer/schedule-task timeout-ms (auth-timeout sess-id))))))
+
 
 ;; WAMP PubSub/RPC callbacks
 
@@ -384,6 +414,7 @@
        :message (str "No such procedure: '" topic "'")}
       (callbacks :on-after-error))))
 
+
 (defn- map-key-or-prefix
   "Finds a map value by key or lookup by string key prefix (ending with *)."
   [m k]
@@ -394,6 +425,7 @@
                 (= \* (last mk))
                 (= (seq (take (dec (count mk)) k)) (butlast mk)))
           mv)))))
+
 
 (defn- on-subscribe
   [callbacks sess-id topic request-id]
@@ -407,10 +439,12 @@
               (do
                 (on-after-cb sess-id topic)))))))))
 
+
 (defn- get-publish-exclude [sess-id exclude]
   (if (= Boolean (type exclude))
     (when (true? exclude) [sess-id])
     exclude))
+
 
 (defn- on-publish
   "Handles WAMP publish messages, sending event messages back out
@@ -433,11 +467,13 @@
             (when (fn? on-after-cb)
               (on-after-cb sess-id topic event exclude eligible))))))))
 
+
 (defmulti handle-message
   (fn [instance msg-type msg-params]
     (let [type-code (wamp2/reverse-message-id msg-type)]
       ; (println "handle-message" msg-type msg-params type-code)
       type-code)))
+
 
 (defmethod handle-message nil
   [instance msg-type msg-params]
@@ -529,6 +565,7 @@
     (core/close-channel (:sess-id instance))
   ))
 
+
 (defmethod handle-message :CALL
   [instance msg-type msg-params]
   (let [sess-id       (:sess-id instance)
@@ -557,7 +594,6 @@
             {:uri (wamp2/error-uri :not-authorized) :message (wamp2/error-uri :not-authorized)}
             (on-call-cbs :on-after-error)))))
 ))
-
 
 
 (defmethod handle-message :SUBSCRIBE
@@ -623,11 +659,13 @@
       ; (println "handle-json-message msg-params:" msg-params)
       (handle-message instance msg-type msg-params))))
 
+
 (defn- create-instance [sess-id callbacks-map]
   {
     :sess-id            sess-id
     :callbacks-map      callbacks-map
   })
+
 
 (defn http-kit-handler
   "Sets up the necessary http-kit websocket event handlers
@@ -757,6 +795,7 @@
   [origin-re req]
   (if-let [req-origin (get-in req [:headers "origin"])]
     (re-matches origin-re req-origin)))
+
 
 (defn subprotocol?
   "Checks if a protocol string exists in the Sec-WebSocket-Protocol

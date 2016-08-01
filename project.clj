@@ -8,7 +8,6 @@
                  [org.clojure/core.async "0.2.385"]
                  [org.clojure/core.incubator "0.1.4"]
                  [org.clojure/data.codec "0.1.0"]
-                 [org.clojure/tools.logging "0.3.1"]
                  [com.taoensso/timbre "4.7.3"]
                  [cheshire "5.6.3"]
                  [http-kit "2.2.0"]  

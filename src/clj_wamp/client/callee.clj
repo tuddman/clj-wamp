@@ -4,7 +4,7 @@
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
     [clj-wamp.core :as core]
-    [clj-wamp.client.v2 :refer [send! error exception-message exception-stacktrace]]
+    [clj-wamp.client.node :refer [send! error exception-message exception-stacktrace]]
     [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
