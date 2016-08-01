@@ -3,8 +3,7 @@
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
-    [clj-wamp.core :as core]
-    [clj-wamp.client.node :refer [send! error exception-message exception-stacktrace]]
+    [clj-wamp.client.node :refer [new-rand-id send! error exception-message exception-stacktrace]]
     [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
@@ -75,7 +74,7 @@
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
            (if-let [[reg-uri reg-fn] (first unregistered)]
-             (let [req-id (core/new-rand-id)]
+             (let [req-id (new-rand-id)]
                (register instance req-id {} reg-uri)
                [(dissoc unregistered reg-uri) registered (assoc pending req-id [reg-uri reg-fn])])
              [unregistered registered pending])))
@@ -113,7 +112,7 @@
            (when debug?
              (log/debug "[unregister!] Unregister " reg-uri))
            (if-let [[reg-id [_ _]] (lib/finds-nested registered reg-uri)]
-             (let [req-id (core/new-rand-id)]
+             (let [req-id (new-rand-id)]
                (unregister instance req-id reg-id)
                [unregistered registered (assoc pending req-id [reg-id reg-uri])])
              [unregistered registered pending])
@@ -131,7 +130,7 @@
   (swap! (:registrations instance)
          (fn [[unregistered registered pending]]
            (if-let [reg-uri (first (get registered reg-id))]
-             (let [req-id (core/new-rand-id)]
+             (let [req-id (new-rand-id)]
                (unregister instance req-id reg-id)
                [unregistered registered (assoc pending req-id [reg-id reg-uri])])
              [unregistered registered pending])

@@ -10,7 +10,6 @@
     ))
 
 
-(def subprotocol-id "wamp.2.json")
 
 ;; WAMP v2 SPEC
 (comment https://tools.ietf.org/html/draft-oberstet-hybi-tavendo-wamp-02)
@@ -20,6 +19,7 @@
   []
   (core/new-rand-id))
 
+
 (defn send!
   [{:keys [debug?] :as instance} msg-data]
   (let [json-str (json/encode msg-data)]
@@ -27,6 +27,7 @@
       (log/debug "Sending WAMP message" json-str))
     (when-let [socket @(:socket instance)]
       (ws/send-msg socket json-str))))
+
 
 (defn hello
   "[HELLO, Realm|uri, Details|dict]"
@@ -40,15 +41,18 @@
             {:features
              {:subscriber_blackwhite_listing true}}}}]))
 
+
 (defn abort
   "[ABORT, Details|dict, Reason|uri]"
   [instance details uri]
   (send! instance [(message-id :ABORT) details uri]))
 
+
 (defn goodbye
   "[GOODBYE, Details|dict, Reason|uri]"
   [instance details uri]
   (send! instance [(message-id :GOODBYE) details uri]))
+
 
 (defn error
  "[ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri]
@@ -57,6 +61,7 @@
   [instance request-type request-id details uri]
   (send! instance
          [(message-id :ERROR) request-type request-id details uri]))
+
 
 (defn publish
   "[PUBLISH, Request|id, Options|dict, Topic|uri]
@@ -68,10 +73,12 @@
         args (if (some? kw-args) (conj args kw-args) args)]
   (send! instance args)))
 
+
 (defn register
   "[REGISTER, Request|id, Options|dict, Procedure|uri]"
   [instance request-id options uri]
   (send! instance [(message-id :REGISTER) request-id options uri]))
+
 
 (defn yield
   "[YIELD, INVOCATION.Request|id, Options|dict]
@@ -83,6 +90,7 @@
         args (if (some? kw-args) (conj args kw-args) args)]
   (send! instance args)))
 
+
 (defn- register-next!
   [instance]
   (swap! (:registrations instance)
@@ -93,6 +101,7 @@
                [(dissoc unregistered reg-uri) registered (assoc pending req-id [reg-uri reg-fn])])
              [unregistered registered pending]))))
 
+
 (defn- exception-message
   [{:keys [debug?] :as instance} ex]
   (if true ; debug?
@@ -100,7 +109,9 @@
      :stacktrace (map str (.getStackTrace ex))}
     {:message "Application error"}))
 
+
 (declare yield-progressive)
+
 
 (defn- yield-return
   [instance req-id return]
@@ -114,12 +125,14 @@
       (:chan-result return) (yield-progressive instance req-id (:chan-result return))
       :else (yield instance req-id {} [return] nil))))
 
+
 (defn- yield-progressive
   [instance req-id return-chan]
   (async/go-loop []
     (when-let [return (async/<! return-chan)]
       (yield-return instance req-id return)
       (recur))))
+
 
 (defn- perform-invocation
   [instance req-id rpc-fn options seq-args map-args]
@@ -132,18 +145,22 @@
     (catch Throwable e
       (error instance (message-id :INVOCATION) req-id (exception-message instance e)))))
 
+
 (defmulti handle-error (fn [instance data] (reverse-message-id (second data))))
+
 
 (defmethod handle-error nil
   [instance data]
   (log/error "Error received from router" data)
   nil)
 
+
 (defmethod handle-error :PUBLISH
   [instance data]
   "[ERROR, PUBLISH, PUBLISH.Request|id, Details|dict, Error|uri]"
   (log/error "Router failed to publish event" data)
   nil)
+
 
 (defmethod handle-error :REGISTER
   [instance data]
@@ -156,15 +173,19 @@
              [(assoc unregistered reg-uri reg-fn) registered (dissoc pending req-id)])))
   nil)
 
+
 (defmulti handle-message (fn [instance data] (reverse-message-id (first data))))
+
 
 (defmethod handle-message nil
   [instance data]
   (error instance 0 0 {:message "Invalid message type"} (error-uri :bad-request)))
 
+
 (defmethod handle-message :WELCOME
   [instance data]
   (register-next! instance))
+
 
 (defmethod handle-message :ABORT
   [instance data]
@@ -172,11 +193,13 @@
   (when-let [socket @(:socket instance)]
     (ws/close socket)))
 
+
 (defmethod handle-message :GOODBYE
   [instance data]
   (goodbye instance {} (error-uri :goodbye-and-out))
   (when-let [socket @(:socket instance)]
     (ws/close socket)))
+
 
 (defmethod handle-message :ERROR
   [instance data]
@@ -185,9 +208,11 @@
    [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]"
   (handle-error instance data))
 
+
 (defmethod handle-message :PUBLISHED
   [instance data]
   nil)
+
 
 (defmethod handle-message :REGISTERED
   [instance data]
@@ -199,6 +224,7 @@
                  [reg-uri reg-fn] (get pending req-id)]
              [unregistered (assoc registered reg-id reg-fn) (dissoc pending req-id)])))
   (register-next! instance))
+
 
 (defmethod handle-message :INVOCATION
   [instance data]

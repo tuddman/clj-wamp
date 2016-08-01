@@ -6,9 +6,9 @@
     [taoensso.timbre :as log]
     [cheshire.core :as json]
     [gniazdo.core :as ws]
-    [clj-wamp.client.node :as node]
+    [clj-wamp.client.node :refer [new-rand-id send!]]
     [clj-wamp.libs.helpers :as lib]
-    [clj-wamp.info.ids :refer [reverse-message-id message-id]]
+    [clj-wamp.info.ids :refer [message-id reverse-message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]
     [clj-wamp.libs.channels :refer [messages]]
@@ -18,12 +18,14 @@
 (defn subscribe
   "[SUBSCRIBE, Request|id, Options|dict, Topic|uri]"
   [instance request-id options uri]
-  (node/send! instance [(message-id :SUBSCRIBE) request-id options uri]))
+  (send! instance [(message-id :SUBSCRIBE) request-id options uri]))
+
 
 (defn unsubscribe
   "[UNSUBSCRIBE, Request|id, SUBSCRIBED.Subscription|id]"
   [instance request-id reg-uri]
-  (node/send! instance [(message-id :UNSUBSCRIBE) request-id reg-uri]))
+  (send! instance [(message-id :UNSUBSCRIBE) request-id reg-uri]))
+
 
 (defn subscribe-next!
   [{:keys [debug? subscriptions] :as instance}]
@@ -38,15 +40,17 @@
 				(subscribe instance sub-id {} reg-uri)
 				(recur)))))
 
+
 (defn subscribe-new!
 	[{:keys [debug? subscriptions] :as instance} reg-uri event-chan]
 	(let [{:keys [unregistered registered]} @subscriptions]
 		(when debug?
 			(log/debug "[subscribe-new] Register " reg-uri))
 		(if-not (lib/contains-nested? registered #(= % reg-uri))
-			(let [req-id (node/new-rand-id)]
+			(let [req-id (new-rand-id)]
 				(go (>! unregistered [req-id reg-uri event-chan])))
       )))
+
 
 (defn unsubscribe!
 	"Deassociates the procedure with the id and sends the unregister message to the server"
@@ -55,7 +59,7 @@
 		(when debug?
 			(log/debug "[unsubscribe!] Unsubscribe " reg-uri))
 		(if-let [[reg-id [_ _]] (contains? @registered reg-uri)]
-			(let [req-id (node/new-rand-id)]
+			(let [req-id (new-rand-id)]
 				(put! pending [reg-id reg-uri])
 				(unsubscribe instance req-id reg-id)
 				)))

@@ -8,7 +8,7 @@
             [clojure.walk :refer [keywordize-keys]]
             [clj-wamp.server.core :as core]
             [clj-wamp.info.ids :refer [message-id reverse-message-id]]
-            [clj-wamp.info.ids :refer [error-uri]]
+            [clj-wamp.info.uris :refer [error-uri]]
             [cheshire.core :as json]
             [org.httpkit.server :as httpkit]
             [org.httpkit.timer :as timer]
