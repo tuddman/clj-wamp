@@ -3,11 +3,11 @@
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
+    [clj-wamp.client.handler.error :refer [handle-error]]
     [clj-wamp.client.node :refer [new-rand-id send! error exception-message exception-stacktrace]]
-    [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
-    [clj-wamp.client.handler.error :refer [handle-error]]
+    [clj-wamp.libs.helpers :as lib]
     [taoensso.timbre :as log]))
 
 

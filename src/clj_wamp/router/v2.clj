@@ -1,7 +1,7 @@
-(ns clj-wamp.server.v2
+(ns clj-wamp.router.v2
   (:require
     [clojure.core.async :as async]
-    [clj-wamp.server.core :as core]  
+    [clj-wamp.router.core :as core]  
     [clj-wamp.info.ids :refer :all]  
     [clj-wamp.info.uris :refer :all]  
     [cheshire.core :as json]

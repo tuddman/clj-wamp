@@ -31,11 +31,11 @@
   [msg-keyword]
   (get message-id-table msg-keyword))
 
-(defn invert-map
+(defn- invert-map
   [dict]
   (into {} (map (fn [[k v]] [v k]) dict)))
 
-(def reverse-message-id-table (invert-map message-id-table))
+(def ^:const reverse-message-id-table (invert-map message-id-table))
 
 (defn reverse-message-id [msg-num]
   (get reverse-message-id-table msg-num))

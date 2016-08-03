@@ -1,20 +1,26 @@
 # clj-wamp
 
-A Clojure implementation of the WebSocket Application Messaging Protocol (v2),
-jor HTTP Kit servers.
+A Clojure implementation of the WebSocket Application Messaging Protocol (v2).
 
 Provides hooks for common WebSocket messaging patterns and error handling (RPC, PubSub, and Authentication).
 
-For information on **HTTP Kit**, a Ring-compatible HTTP server for Clojure, visit [http-kit.org](http://http-kit.org/).
-
 For information on the **WAMP v2 specification**, visit [wamp.ws](http://wamp.ws).
+
+
+### Components
+
+the `router` wraps and extends **http-kit** and exposes `Broker` and `Dealer` roles
+
+For information on **HTTP Kit**, a Ring-compatible HTTP & WebSocket server for Clojure, visit [http-kit.org](http://http-kit.org/).
+
+the `client` node exposes `Publisher` and  `Subscriber` and `Caller` and `Callee` roles.
 
 
 ## Status
 
 This library originally supported running a `server` for v1 of the WAMP spec. Version 1 has been largely deprecated. Some work has been done to implement some of the v2 features of a `client`
 
-WIP to bring this library up to support for v2 of the spec for both a `client` (Publisher | Subscriber | Caller | Callee ) and for a `server` (Broker | Dealer)
+WIP to bring this library up to support for v2 of the spec for both a `client` (Publisher | Subscriber | Caller | Callee ) and to fold the v1 `server` into a v2 `router` (Broker | Dealer)
 
 **NOT RECOMMENDED** for production systems until a stable release can be tested and published.
 
@@ -33,7 +39,7 @@ Run clj-wamp's http-kit-handler within http-kit's with-channel context:
 ```clojure
 (ns clj-wamp-example
   (:require [org.httpkit.server :as http-kit]
-            [clj-wamp.server :as wamp]))
+            [clj-wamp.router :as wamp]))
 
 ; Topic URIs
 (defn rpc-url [path] (str "http://clj-wamp-example/api#"   path))

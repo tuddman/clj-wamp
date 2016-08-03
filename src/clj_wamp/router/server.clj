@@ -1,4 +1,4 @@
-(ns clj-wamp.server.server
+(ns clj-wamp.router.server
   ^{:author "Christopher Martin, Ryan Sundberg"
     :doc "Clojure implementation of the WebSocket Application Messaging Protocol, version 2"}
   (:use [clojure.core.incubator :only [dissoc-in]]
@@ -6,7 +6,7 @@
   (:require [clojure.java.io :as io]
             [clojure.data.codec.base64 :as base64]
             [clojure.walk :refer [keywordize-keys]]
-            [clj-wamp.server.core :as core]
+            [clj-wamp.router.core :as core]
             [clj-wamp.info.ids :refer [message-id reverse-message-id]]
             [clj-wamp.info.uris :refer [error-uri]]
             [cheshire.core :as json]

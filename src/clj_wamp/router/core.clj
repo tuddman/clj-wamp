@@ -1,7 +1,7 @@
-(ns clj-wamp.server.core
+(ns clj-wamp.router.core
   (:require 
-    [clojure.string :refer [split]]
     [cheshire.core :as json] 
+    [clojure.string :refer [split]]
     [org.httpkit.server :as httpkit]
     [taoensso.timbre :as log])
   (:import

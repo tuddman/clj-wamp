@@ -3,15 +3,14 @@
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub put! take!]]
-    [taoensso.timbre :as log]
-    [cheshire.core :as json]
-    [gniazdo.core :as ws]
     [clj-wamp.client.node :refer [new-rand-id send!]]
+    [clj-wamp.client.handler.error :refer [handle-error]]  
     [clj-wamp.libs.helpers :as lib]
     [clj-wamp.info.ids :refer [message-id reverse-message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
-    [clj-wamp.client.handler.error :refer [handle-error]]
-    [clj-wamp.libs.channels :refer [messages]]))
+    [cheshire.core :as json]
+    [gniazdo.core :as ws]
+    [taoensso.timbre :as log] ))
 
 
 (defn subscribe
