@@ -24,6 +24,7 @@
 
 (declare yield-progressive)
 
+
 (defn- yield-return
   [instance req-id return]
   (if-let [return-error (:error return)]
@@ -36,12 +37,14 @@
       (:chan-result return) (yield-progressive instance req-id (:chan-result return))
       :else (yield instance req-id {} [return] nil))))
 
+
 (defn- yield-progressive
   [instance req-id return-chan]
   (go-loop []
     (when-let [return (<! return-chan)]
       (yield-return instance req-id return)
       (recur))))
+
 
 (defn perform-invocation
   [instance req-id rpc-fn options seq-args map-args]
@@ -54,14 +57,14 @@
     (catch Throwable e
       (if-let [cause (.getCause e)]
         (error instance [(message-id :INVOCATION) req-id {} (.getMessage cause) [(exception-message instance e)] (exception-stacktrace instance e)])
-        (error instance [(message-id :INVOCATION) req-id {} (error-uri :internal-error) [(exception-message instance e)] (exception-stacktrace instance e)]))))
-  )
+        (error instance [(message-id :INVOCATION) req-id {} (error-uri :internal-error) [(exception-message instance e)] (exception-stacktrace instance e)])))))
 
 
 (defn register
   "[REGISTER, Request|id, Options|dict, Procedure|uri]"
   [instance request-id options uri]
   (send! instance [(message-id :REGISTER) request-id options uri]))
+
 
 (defn unregister
   "[UNREGISTER, Request|id, REGISTERED.Registration|id]"
@@ -81,8 +84,8 @@
   (when debug?
     (let [[_ _ pending] @(:registrations instance)]
       (log/debug "[register-next!] pending procedures " pending)
-      ))
-  )
+      )))
+
 
 (defn register-new!
   "Associates the uri to the function as unregistred command. If the uri is already registred,
@@ -101,8 +104,8 @@
       (log/debug "[register-new!] unregistered procedures " unregistered)
       ))
 
-  (register-next! instance)
-  )
+  (register-next! instance))
+
 
 (defn unregister!
   "Deassociates the procedure with the id and sends the unregister message to the server"
@@ -120,9 +123,9 @@
 
   (when debug?
     (let [[_ _ pending] @(:registrations instance)]
-      (log/debug "[unregister!] pending procedures " pending)
-      )  )
+      (log/debug "[unregister!] pending procedures " pending)))
   nil)
+
 
 (defn unregister-by-id!
   "Deassociates the procedure with the id and sends the unregister message to the server"
@@ -136,3 +139,4 @@
              [unregistered registered pending])
            ))
   nil)
+

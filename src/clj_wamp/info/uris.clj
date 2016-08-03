@@ -2,7 +2,8 @@
 
 ; Predefined URIs
 (def ^:const wamp-error-uri-table
-  {:invalid-uri "wamp.error.invalid_uri"
+  {
+   :invalid-uri "wamp.error.invalid_uri"
    :no-such-procedure "wamp.error.no_such_procedure"
    :procedure-already-exists "wamp.error.procedure_already_exists"
    :no-such-registration "wamp.error.no_such_registration"
@@ -19,7 +20,8 @@
    :internal-error "wamp.error.internal-error"
    :application-error "wamp.error.application_error"
    :bad-request "wamp.error.bad-request"
-   :runtime-error "wamp.error.runtime_error"})
+   :runtime-error "wamp.error.runtime_error" })
+
 
 (defmacro error-uri
   [error-keyword]

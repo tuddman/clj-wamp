@@ -16,4 +16,7 @@ pom.xml.asc
 *.iml
 .nrepl-port
 
+.DS_Store
+
 *.swp
+notes.txt

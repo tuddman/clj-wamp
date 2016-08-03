@@ -6,8 +6,7 @@
     [clj-wamp.info.uris :refer :all]  
     [cheshire.core :as json]
     [gniazdo.core :as ws]
-    [taoensso.timbre :as log] 
-    ))
+    [taoensso.timbre :as log] ))
 
 
 
@@ -42,16 +41,16 @@
              {:subscriber_blackwhite_listing true}}}}]))
 
 
-(defn abort
-  "[ABORT, Details|dict, Reason|uri]"
-  [instance details uri]
-  (send! instance [(message-id :ABORT) details uri]))
-
-
 (defn goodbye
   "[GOODBYE, Details|dict, Reason|uri]"
   [instance details uri]
   (send! instance [(message-id :GOODBYE) details uri]))
+ 
+
+(defn abort
+  "[ABORT, Details|dict, Reason|uri]"
+  [instance details uri]
+  (send! instance [(message-id :ABORT) details uri]))
 
 
 (defn error

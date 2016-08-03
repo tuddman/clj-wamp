@@ -4,8 +4,8 @@
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout pub]]
     [clj-wamp.client.node :refer [send!]]
-    [clj-wamp.info.ids :refer [message-id]]
-    ))
+    [clj-wamp.info.ids :refer [message-id]]))
+
 
 (defn call
   "[CALL, Request|id, Options|dict, Procedure|uri]

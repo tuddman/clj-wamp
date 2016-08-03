@@ -5,8 +5,8 @@
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]
     [clojure.data.codec.base64 :as b64]
-    [taoensso.timbre :as log]
-    [pandect.algo.sha256 :refer [sha256-hmac-bytes]]))
+    [pandect.algo.sha256 :refer [sha256-hmac-bytes]]  
+    [taoensso.timbre :as log]))
 
 (defn generateHash
   [string secret]
@@ -14,7 +14,9 @@
       (b64/encode)
       (String. "UTF-8")))
 
+
 (defmulti handle-authenticate (fn [_ auth-method _] (keyword auth-method)))
+
 
 (defmethod handle-authenticate :wampcra
   [{:keys [debug? auth-details] :as instance} _ extra]

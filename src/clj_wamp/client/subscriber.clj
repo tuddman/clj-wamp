@@ -11,8 +11,7 @@
     [clj-wamp.info.ids :refer [message-id reverse-message-id]]
     [clj-wamp.info.uris :refer [error-uri]]
     [clj-wamp.client.handler.error :refer [handle-error]]
-    [clj-wamp.libs.channels :refer [messages]]
-    ))
+    [clj-wamp.libs.channels :refer [messages]]))
 
 
 (defn subscribe
@@ -48,8 +47,7 @@
 			(log/debug "[subscribe-new] Register " reg-uri))
 		(if-not (lib/contains-nested? registered #(= % reg-uri))
 			(let [req-id (new-rand-id)]
-				(go (>! unregistered [req-id reg-uri event-chan])))
-      )))
+				(go (>! unregistered [req-id reg-uri event-chan]))))))
 
 
 (defn unsubscribe!
@@ -61,12 +59,9 @@
 		(if-let [[reg-id [_ _]] (contains? @registered reg-uri)]
 			(let [req-id (new-rand-id)]
 				(put! pending [reg-id reg-uri])
-				(unsubscribe instance req-id reg-id)
-				)))
+				(unsubscribe instance req-id reg-id))))
 
 	(when debug?
 		(let [[_ _ pending] @(:registrations instance)]
-			(log/debug "[unregister!] pending procedures " pending)
-			))
-	)
+			(log/debug "[unregister!] pending procedures " pending))))
 

@@ -14,11 +14,14 @@
     [taoensso.timbre :as log]
     ))
 
+
 (defmulti handle-message (fn [_ data] (reverse-message-id (first data))))
+
 
 (defmethod handle-message nil
   [instance _]
   (error instance [0 0 {} (error-uri :bad-request) ["Invalid message type"]]))
+
 
 (defmethod handle-message :CHALLENGE
   [{:keys [debug?] :as instance} data]
@@ -26,14 +29,14 @@
   (let [[_ auth-method extra] data]
     (when debug?
       (log/debug "WAMP challenge received:" auth-method extra))
-
     (handle-authenticate instance auth-method extra)))
+
 
 (defmethod handle-message :WELCOME
   [instance _]
   (register-next! instance)
-  (subscribe-next! instance)
-  )
+  (subscribe-next! instance) )
+
 
 (defmethod handle-message :ABORT
   [instance _]
@@ -41,11 +44,13 @@
   (when-let [socket @(:socket instance)]
     (ws/close socket)))
 
+
 (defmethod handle-message :GOODBYE
   [instance _]
   (goodbye instance {} (error-uri :goodbye-and-out))
   (when-let [socket @(:socket instance)]
     (ws/close socket)))
+
 
 (defmethod handle-message :ERROR
   [instance data]
@@ -54,9 +59,11 @@
    [ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri, Arguments|list, ArgumentsKw|dict]"
   (handle-error instance data))
 
+
 (defmethod handle-message :PUBLISHED
   [_ _]
   nil)
+
 
 (defmethod handle-message :REGISTERED
   [{:keys [debug?] :as instance} data]
@@ -77,6 +84,7 @@
   nil
   )
 
+
 (defmethod handle-message :UNREGISTERED
   [{:keys [debug?] :as instance} data]
   "[UNREGISTERED, UNREGISTER.Request|id]"
@@ -93,6 +101,7 @@
       (log/debug "registered procedures " registered)
       ))
   nil)
+
 
 (defmethod handle-message :INVOCATION
   [instance data]
@@ -111,6 +120,7 @@
                        ["Unregistered RPC"]
                        {:reg-id reg-id}]))))
 
+
 (defmethod handle-message :RESULT
   [_ data]
   "Receives the Result Message after an call. Publishes it via core async, using the topic :RESULT
@@ -120,6 +130,7 @@
   (let [[_ req-id details arguments arguments-kw] data]
     (go (>! messages {:topic :RESULT :req-id req-id :details details, :arguments arguments, :arguments-kw arguments-kw})))
   )
+
 
 (defmethod handle-message :SUBSCRIBED
   [{:keys [debug?] :as instance} data]
@@ -136,6 +147,7 @@
       (log/debug "registered procedures " @registered)
       ))
   )
+
 
 (defmethod handle-message :UNSUBSCRIBED
   [{:keys [debug?] :as instance} data]

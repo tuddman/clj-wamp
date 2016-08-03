@@ -7,11 +7,10 @@
     [gniazdo.core :as ws]
     [clj-wamp.client.handler.messages :as hm]
     [clj-wamp.client.publisher :refer [publish]]
-    [clj-wamp.client.subscriber :as subscriber]
+    [clj-wamp.client.subscriber :refer [subscribe-new! unsubscribe!]]
     [clj-wamp.client.callee :as callee]
     [clj-wamp.client.caller :as caller]
     [clj-wamp.info.ids :refer [message-id]]
-    [clj-wamp.libs.channels :refer [incoming-messages]]
     [clojure.core.async
      :refer [>! <! >!! <!! go go-loop chan buffer close! thread
              alts! alts!! timeout sub put!]])
@@ -75,15 +74,18 @@
                  (if authenticate?
                    (apply dissoc (:auth-details instance) [:secret])))]))
 
-(defn abort
-  "[ABORT, Details|dict, Reason|uri]"
-  [instance details uri]
-  (send! instance [(message-id :ABORT) details uri]))
 
 (defn goodbye
   "[GOODBYE, Details|dict, Reason|uri]"
   [instance details uri]
   (send! instance [(message-id :GOODBYE) details uri]))
+ 
+
+(defn abort
+  "[ABORT, Details|dict, Reason|uri]"
+  [instance details uri]
+  (send! instance [(message-id :ABORT) details uri]))
+
 
 (defn error
  "[ERROR, REQUEST.Type|int, REQUEST.Request|id, Details|dict, Error|uri]
@@ -94,11 +96,13 @@
   (send! instance
          [(message-id :ERROR) request-type request-id details uri arguments arguments-kw])))
 
+
 (defn exception-message
   [{:keys [debug?] :as _} ex]
   (if debug?
     (.getMessage ex)
     "Application error"))
+
 
 (defn exception-stacktrace
   [{:keys [debug?] :as _} ex]
@@ -175,13 +179,13 @@
 (defn subscribe!
   "Subscribe to an Event"
   [instance event-uri event-chan]
-  (subscriber/subscribe-new! instance event-uri event-chan))
+  (subscribe-new! instance event-uri event-chan))
 
 
 (defn unsubscribe!
   "Unsubscribe of an Event"
   [instance event-uri]
-  (subscriber/unsubscribe! instance event-uri))
+  (unsubscribe! instance event-uri))
 
 
 (defn unsubscribe-all!

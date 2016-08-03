@@ -1,13 +1,25 @@
 # clj-wamp
 
 A Clojure implementation of the WebSocket Application Messaging Protocol (v2),
-for HTTP Kit servers.
+jor HTTP Kit servers.
 
 Provides hooks for common WebSocket messaging patterns and error handling (RPC, PubSub, and Authentication).
 
 For information on **HTTP Kit**, a Ring-compatible HTTP server for Clojure, visit [http-kit.org](http://http-kit.org/).
 
 For information on the **WAMP v2 specification**, visit [wamp.ws](http://wamp.ws).
+
+
+## Status
+
+This library originally supported running a `server` for v1 of the WAMP spec. Version 1 has been largely deprecated. Some work has been done to implement some of the v2 features of a `client`
+
+WIP to bring this library up to support for v2 of the spec for both a `client` (Publisher | Subscriber | Caller | Callee ) and for a `server` (Broker | Dealer)
+
+**NOT RECOMMENDED** for production systems until a stable release can be tested and published.
+
+
+
 
 ## Usage
 

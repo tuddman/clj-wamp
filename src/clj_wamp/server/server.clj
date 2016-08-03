@@ -201,6 +201,7 @@
                                   :description err-desc} err-uri)
     (when kill (core/close-channel sess-id))))
 
+
 ; Optional session id for rpc calls
 (def ^:dynamic *call-sess-id* nil)
 
@@ -281,6 +282,7 @@
       (let [perms (perm-cb sess-id auth-key)]
         (permission? perms category topic)))))
 
+
 ; (defn- create-call-authreq
 ;   "Creates a callback for the authreq RPC call."
 ;   [allow-anon? secret-cb]
@@ -324,6 +326,7 @@
              (for [[topic _] (get wamp-cbs wamp-key)]
                (if (permission? perms perm-key topic)
                  {topic true}))))}))))
+
 
 ; (defn- create-call-auth
 ;   "Creates a callback for the auth RPC call."
